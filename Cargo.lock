@@ -508,6 +508,7 @@ dependencies = [
  "r2d2_redis",
  "serde",
  "serde_json",
+ "substring",
  "thiserror",
  "tokio",
  "tracing",
@@ -1012,6 +1013,15 @@ name = "strsim"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccbca6f34534eb78dbee83f6b2c9442fea7113f43d9e80ea320f0972ae5dc08d"
+
+[[package]]
+name = "substring"
+version = "1.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42ee6433ecef213b2e72f587ef64a2f5943e7cd16fbd82dbe8bc07486c534c86"
+dependencies = [
+ "autocfg",
+]
 
 [[package]]
 name = "syn"

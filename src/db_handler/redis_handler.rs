@@ -1,12 +1,16 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::{collections::HashMap, time::Duration};
+use substring::Substring;
 use thiserror::Error;
+use tracing::info;
 
 use r2d2_redis::{
     r2d2,
     redis::{Commands, FromRedisValue},
     RedisConnectionManager,
 };
+
+use super::DBHandler;
 
 pub type R2D2Pool = r2d2::Pool<RedisConnectionManager>;
 pub type R2D2Con = r2d2::PooledConnection<RedisConnectionManager>;
@@ -15,6 +19,8 @@ const CACHE_POOL_MAX_OPEN: u32 = 200;
 const CACHE_POOL_MIN_IDLE: u32 = 8;
 const CACHE_POOL_TIMEOUT_SECONDS: u64 = 3;
 const CACHE_POOL_EXPIRE_SECONDS: u64 = 1;
+
+pub const REDIS_ACCOUNT_KEY: &str = "IRONACCOUNT";
 
 #[derive(Error, Debug)]
 pub enum R2D2Error {
@@ -70,6 +76,12 @@ impl RedisClient {
         Ok(())
     }
 
+    pub fn hget(&self, key: &str, field: &str) -> Result<String> {
+        let mut con = self.get_con()?;
+        let val = con.hget(key, field).unwrap();
+        Ok(val)
+    }
+
     pub fn hgetall(&self, key: &str) -> Result<HashMap<String, String>> {
         let mut con = self.get_con()?;
         let vals: HashMap<String, String> = con.hgetall(key).unwrap();
@@ -87,4 +99,40 @@ impl RedisClient {
         let value = con.get(key).map_err(R2D2Error::RedisCMDError)?;
         FromRedisValue::from_redis_value(&value).map_err(|e| R2D2Error::RedisTypeError(e).into())
     }
+}
+
+impl DBHandler for RedisClient {
+    fn init(db_addr: &str) -> Self {
+        info!("Redis handler selected");
+        Self::connect(db_addr).unwrap()
+    }
+
+    fn save_account(&self, address: String, _worker_id: u32) -> Result<String> {
+        let account_name = address_to_name(&address);
+        self.hset(REDIS_ACCOUNT_KEY, &address, &account_name)
+            .unwrap();
+        info!(
+            "New account saved in redis, name: {}, address: {}",
+            account_name, address
+        );
+        Ok(account_name)
+    }
+
+    fn get_account(&self, address: String) -> Result<String> {
+        match self.hget(REDIS_ACCOUNT_KEY, &address) {
+            Ok(name) => {
+                let account_compute_name = address_to_name(&address);
+                if name == account_compute_name {
+                    Ok(name)
+                } else {
+                    Err(anyhow!("Account name doesnot match the one in db"))
+                }
+            }
+            Err(_e) => Err(anyhow!("Account not existed in db")),
+        }
+    }
+}
+
+pub fn address_to_name(address: &str) -> String {
+    address.substring(0, 10).into()
 }
