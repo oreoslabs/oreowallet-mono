@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Result;
 use axum::{routing::post, Router};
-use db_handler::RedisClient;
+use db_handler::{DBHandler, RedisClient};
 use rpc_handler::RpcHandler;
 use tokio::{net::TcpListener, sync::oneshot};
 use tracing::{info, warn};
@@ -17,22 +17,26 @@ pub mod db_handler;
 pub mod rpc_handler;
 pub mod web_handlers;
 
-pub struct SharedState {
-    pub db_handler: RedisClient,
+pub struct SharedState<T: DBHandler> {
+    pub db_handler: T,
     pub rpc_handler: RpcHandler,
 }
 
-impl SharedState {
-    pub fn new(redis: &str, endpoint: &str) -> Self {
+impl<T> SharedState<T>
+where
+    T: DBHandler,
+{
+    pub fn new(db_handler: T, endpoint: &str) -> Self {
         Self {
-            db_handler: RedisClient::connect(redis).unwrap(),
+            db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
         }
     }
 }
 
 pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -> Result<()> {
-    let shared_state = Arc::new(Mutex::new(SharedState::new(&redis, &rpc_server)));
+    let db_handler = RedisClient::init(&redis);
+    let shared_state = Arc::new(Mutex::new(SharedState::new(db_handler, &rpc_server)));
     let router = Router::new()
         .route("/account", post(import_view_only_handler))
         .with_state(shared_state);
