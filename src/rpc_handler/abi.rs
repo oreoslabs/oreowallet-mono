@@ -55,8 +55,11 @@ pub struct OutPut {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateTxReq {
     pub account: String,
+    pub fee: Option<String>,
+    pub expiration_delta: Option<u32>,
     pub outputs: Vec<OutPut>,
 }
 

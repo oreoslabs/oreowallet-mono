@@ -120,6 +120,8 @@ pub async fn create_transaction_handler<T: DBHandler>(
         .create_transaction(CreateTxReq {
             account: account_name,
             outputs: create_transaction.outputs,
+            fee: Some(create_transaction.fee.unwrap_or("1".into())),
+            expiration_delta: Some(create_transaction.expiration_delta.unwrap_or(30)),
         })
         .await
         .unwrap();
