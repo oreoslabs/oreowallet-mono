@@ -13,7 +13,10 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
-use crate::web_handlers::import_vk_handler;
+use crate::web_handlers::{
+    broadcast_transaction_handler, create_transaction_handler, get_balances_handler,
+    get_transactions_handler, import_vk_handler,
+};
 
 pub mod config;
 pub mod db_handler;
@@ -47,7 +50,11 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
     let db_handler = RedisClient::init(&redis);
     let shared_state = Arc::new(Mutex::new(SharedState::new(db_handler, &rpc_server)));
     let router = Router::new()
-        .route("/account", post(import_vk_handler))
+        .route("/import", post(import_vk_handler))
+        .route("/getBalances", post(get_balances_handler))
+        .route("/getTransactions", post(get_transactions_handler))
+        .route("/createTx", post(create_transaction_handler))
+        .route("/broadcastTx", post(broadcast_transaction_handler))
         .with_state(Store {
             inner: shared_state,
         })
