@@ -20,3 +20,11 @@ tower-http = { version = "0.5.0", features = ["cors"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 ureq = { version = "2.9.1", features = ["json"] }
+ironfish_rust = { package = "ironfish", git = "https://github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm"}
+# ironfish_rust = { package = "ironfish", path = "../ironfish/ironfish-rust"}
+ironfish_zkp = { package = "ironfish_zkp", git = "https://github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm"}
+# ironfish_zkp = { package = "ironfish_zkp", path = "../ironfish/ironfish-zkp"}
+blst = "=0.3.10"
+
+[dev-dependencies]
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }

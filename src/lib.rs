@@ -15,10 +15,11 @@ use tracing_subscriber::EnvFilter;
 
 use crate::web_handlers::{
     broadcast_transaction_handler, create_transaction_handler, get_balances_handler,
-    get_transactions_handler, import_vk_handler,
+    get_transactions_handler, import_vk_handler, generate_proof_handler,
 };
 
 pub mod config;
+
 pub mod db_handler;
 pub mod rpc_handler;
 pub mod web_handlers;
@@ -55,6 +56,7 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
         .route("/getTransactions", post(get_transactions_handler))
         .route("/createTx", post(create_transaction_handler))
         .route("/broadcastTx", post(broadcast_transaction_handler))
+        .route("/generate_proofs", post(generate_proof_handler))
         .with_state(Store {
             inner: shared_state,
         })
@@ -104,4 +106,29 @@ pub async fn handle_signals() -> anyhow::Result<()> {
     let _ = handler.await;
     info!("Signal handler installed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::web_handlers::abi::GenerateProofReuqest;
+
+
+    #[tokio::test]
+    async fn generate_proofs_works() {
+        let client = reqwest::Client::new();
+        // let body = "{circuits:[1,2,3]}";
+        let body = GenerateProofReuqest {
+            circuits: vec![1, 2, 3],
+        };
+        let body = serde_json::to_string(&body).unwrap();
+        let response = client
+            .post("http://127.0.0.1:10001/generate_proofs")
+            .header("Content-Type", "application/json")
+            .body(body)
+            .send()
+            .await
+            .expect("failed to generate proofs");
+        println!("response {:?}", response);
+        assert!(response.status().is_success());
+    }
 }
