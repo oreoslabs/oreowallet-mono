@@ -1,22 +1,26 @@
-use std::{
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Result;
-use axum::{routing::post, Router};
+use axum::{error_handling::HandleErrorLayer, http::StatusCode, routing::post, BoxError, Router};
 use db_handler::{DBHandler, RedisClient};
 use rpc_handler::RpcHandler;
-use tokio::{net::TcpListener, sync::oneshot};
+use tokio::{
+    net::TcpListener,
+    sync::{oneshot, Mutex},
+};
+use tower::{timeout::TimeoutLayer, ServiceBuilder};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
-use web_handlers::import_view_only_handler;
 
+use crate::web_handlers::import_vk_handler;
+
+pub mod config;
 pub mod db_handler;
 pub mod rpc_handler;
 pub mod web_handlers;
 
+#[derive(Debug, Clone)]
 pub struct SharedState<T: DBHandler> {
     pub db_handler: T,
     pub rpc_handler: RpcHandler,
@@ -34,12 +38,28 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Store<T: DBHandler> {
+    pub inner: Arc<Mutex<SharedState<T>>>,
+}
+
 pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -> Result<()> {
     let db_handler = RedisClient::init(&redis);
     let shared_state = Arc::new(Mutex::new(SharedState::new(db_handler, &rpc_server)));
     let router = Router::new()
-        .route("/account", post(import_view_only_handler))
-        .with_state(shared_state);
+        .route("/account", post(import_vk_handler))
+        .with_state(Store {
+            inner: shared_state,
+        })
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|_: BoxError| async {
+                    StatusCode::REQUEST_TIMEOUT
+                }))
+                .layer(TimeoutLayer::new(Duration::from_secs(30)))
+                .layer(CorsLayer::new().allow_methods(Any).allow_origin(Any)),
+        );
+
     let listener = TcpListener::bind(&listen).await?;
     axum::serve(listener, router).await?;
     info!("Server listening on {}", listen);

@@ -34,6 +34,7 @@ pub enum R2D2Error {
     RedisClientError(r2d2_redis::redis::RedisError),
 }
 
+#[derive(Debug, Clone)]
 pub struct RedisClient {
     pub pool: r2d2::Pool<RedisConnectionManager>,
 }

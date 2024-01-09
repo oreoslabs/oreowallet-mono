@@ -5,6 +5,7 @@ use ureq::{Agent, AgentBuilder};
 
 use super::abi::*;
 
+#[derive(Debug, Clone)]
 pub struct RpcHandler {
     pub endpoint: String,
     pub agent: Agent,
