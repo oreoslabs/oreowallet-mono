@@ -13,6 +13,8 @@ use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 use web_handlers::import_view_only_handler;
 
+use crate::web_handlers::generate_proof_handler;
+
 pub mod db_handler;
 pub mod rpc_handler;
 pub mod web_handlers;
@@ -35,6 +37,7 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
     let shared_state = Arc::new(Mutex::new(SharedState::new(&redis, &rpc_server)));
     let router = Router::new()
         .route("/account", post(import_view_only_handler))
+        .route("/generate_proofs", post(generate_proof_handler))
         .with_state(shared_state);
     let listener = TcpListener::bind(&listen).await?;
     axum::serve(listener, router).await?;
@@ -73,4 +76,27 @@ pub async fn handle_signals() -> anyhow::Result<()> {
     let _ = handler.await;
     info!("Signal handler installed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::web_handlers::GenerateProofReuqest;
+
+    #[tokio::test]
+    async fn generate_proofs_works() {
+        let client = reqwest::Client::new();
+        // let body = "{circuits:[1,2,3]}";
+        let body = GenerateProofReuqest {
+            circuits: vec![1, 2, 3],
+        };
+        let body = serde_json::to_string(&body).unwrap();
+        let response = client
+            .post("http://127.0.0.1:10001/generate_proofs")
+            .body(body)
+            .send()
+            .await
+            .expect("failed to generate proofs");
+        println!("response {:?}", response);
+        assert!(response.status().is_success());
+    }
 }

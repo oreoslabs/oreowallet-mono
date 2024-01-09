@@ -18,3 +18,9 @@ tokio = { version = "1.35.1", features = ["full"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 ureq = { version = "2.9.1", features = ["json"] }
+# ironfish_rust = { package = "ironfish", git = "https://github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm"}
+ironfish_rust = { package = "ironfish", path = "../ironfish/ironfish-rust"}
+blst = "=0.3.10"
+
+[dev-dependencies]
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
