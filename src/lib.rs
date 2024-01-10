@@ -26,7 +26,7 @@ pub mod web_handlers;
 
 #[derive(Debug, Clone)]
 pub struct SharedState<T: DBHandler> {
-    pub db_handler: T,
+    pub db_handler: Arc<Mutex<T>>,
     pub rpc_handler: RpcHandler,
 }
 
@@ -36,20 +36,15 @@ where
 {
     pub fn new(db_handler: T, endpoint: &str) -> Self {
         Self {
-            db_handler,
+            db_handler: Arc::new(Mutex::new(db_handler)),
             rpc_handler: RpcHandler::new(endpoint.into()),
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Store<T: DBHandler> {
-    pub inner: Arc<Mutex<SharedState<T>>>,
-}
-
 pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -> Result<()> {
     let db_handler = RedisClient::init(&redis);
-    let shared_state = Arc::new(Mutex::new(SharedState::new(db_handler, &rpc_server)));
+    let shared_state = SharedState::new(db_handler, &rpc_server);
     let router = Router::new()
         .route("/import", post(import_vk_handler))
         .route("/getBalances", post(get_balances_handler))
@@ -57,9 +52,8 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
         .route("/createTx", post(create_transaction_handler))
         .route("/broadcastTx", post(broadcast_transaction_handler))
         .route("/generate_proofs", post(generate_proof_handler))
-        .with_state(Store {
-            inner: shared_state,
-        })
+        .with_state(shared_state,
+        )
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|_: BoxError| async {
@@ -111,7 +105,6 @@ pub async fn handle_signals() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use crate::web_handlers::abi::GenerateProofReuqest;
-
 
     #[tokio::test]
     async fn generate_proofs_works() {
