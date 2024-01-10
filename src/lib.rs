@@ -14,8 +14,8 @@ use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 use crate::web_handlers::{
-    broadcast_transaction_handler, create_transaction_handler, get_balances_handler,
-    get_transactions_handler, import_vk_handler, generate_proof_handler,
+    broadcast_transaction_handler, create_transaction_handler, generate_proof_handler,
+    get_balances_handler, get_transactions_handler, import_vk_handler,
 };
 
 pub mod config;
@@ -52,8 +52,7 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
         .route("/createTx", post(create_transaction_handler))
         .route("/broadcastTx", post(broadcast_transaction_handler))
         .route("/generate_proofs", post(generate_proof_handler))
-        .with_state(shared_state,
-        )
+        .with_state(shared_state)
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|_: BoxError| async {
@@ -104,24 +103,118 @@ pub async fn handle_signals() -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::web_handlers::abi::GenerateProofReuqest;
+    use bellperson::groth16::Proof;
+    use blstrs::Bls12;
+    use ff::{Field, PrimeField, PrimeFieldBits};
+    use group::{Curve, Group};
+    use ironfish_zkp::constants::PUBLIC_KEY_GENERATOR;
+    use ironfish_zkp::util::commitment_full_point;
+    use ironfish_zkp::{primitives::ValueCommitment, proofs::Spend};
+    use rand::{rngs::StdRng, RngCore, SeedableRng};
+    use zcash_primitives::constants::VALUE_COMMITMENT_VALUE_GENERATOR;
+    use zcash_primitives::sapling::{pedersen_hash, Note, ProofGenerationKey, Rseed};
+
+    use crate::web_handlers::abi::{GenerateProofRep, GenerateProofReq};
+
+    fn build_spend() -> Spend {
+        let mut rng = StdRng::seed_from_u64(0);
+        let tree_depth = 32;
+
+        let value_commitment = ValueCommitment {
+            value: rng.next_u64(),
+            randomness: jubjub::Fr::random(&mut rng),
+            asset_generator: (*VALUE_COMMITMENT_VALUE_GENERATOR).into(),
+        };
+
+        let proof_generation_key = ProofGenerationKey {
+            ak: jubjub::SubgroupPoint::random(&mut rng),
+            nsk: jubjub::Fr::random(&mut rng),
+        };
+
+        let viewing_key = proof_generation_key.to_viewing_key();
+
+        let payment_address = *PUBLIC_KEY_GENERATOR * viewing_key.ivk().0;
+        let commitment_randomness = jubjub::Fr::random(&mut rng);
+        let auth_path =
+            vec![Some((blstrs::Scalar::random(&mut rng), rng.next_u32() % 2 != 0)); tree_depth];
+        let ar = jubjub::Fr::random(&mut rng);
+
+        let note = Note {
+            value: value_commitment.value,
+            g_d: *PUBLIC_KEY_GENERATOR,
+            pk_d: payment_address,
+            rseed: Rseed::BeforeZip212(commitment_randomness),
+        };
+
+        let commitment = commitment_full_point(
+            value_commitment.asset_generator,
+            value_commitment.value,
+            payment_address,
+            note.rcm(),
+            payment_address,
+        );
+        let cmu = jubjub::ExtendedPoint::from(commitment).to_affine().get_u();
+
+        let mut cur = cmu;
+
+        for (i, val) in auth_path.clone().into_iter().enumerate() {
+            let (uncle, b) = val.unwrap();
+
+            let mut lhs = cur;
+            let mut rhs = uncle;
+
+            if b {
+                ::std::mem::swap(&mut lhs, &mut rhs);
+            }
+
+            let lhs = lhs.to_le_bits();
+            let rhs = rhs.to_le_bits();
+
+            cur = jubjub::ExtendedPoint::from(pedersen_hash::pedersen_hash(
+                pedersen_hash::Personalization::MerkleTree(i),
+                lhs.iter()
+                    .by_vals()
+                    .take(blstrs::Scalar::NUM_BITS as usize)
+                    .chain(rhs.iter().by_vals().take(blstrs::Scalar::NUM_BITS as usize)),
+            ))
+            .to_affine()
+            .get_u();
+        }
+
+        Spend {
+            value_commitment: Some(value_commitment.clone()),
+            proof_generation_key: Some(proof_generation_key.clone()),
+            payment_address: Some(payment_address),
+            commitment_randomness: Some(commitment_randomness),
+            ar: Some(ar),
+            auth_path: auth_path.clone(),
+            anchor: Some(cur),
+            sender_address: Some(payment_address),
+        }
+    }
 
     #[tokio::test]
     async fn generate_proofs_works() {
         let client = reqwest::Client::new();
-        // let body = "{circuits:[1,2,3]}";
-        let body = GenerateProofReuqest {
-            circuits: vec![1, 2, 3],
+        let spend = build_spend();
+        println!("payment address: {:?}", spend.payment_address);
+        let mut writer = vec![];
+        spend.write(&mut writer).unwrap();
+        let body = GenerateProofReq {
+            spends: vec![writer],
         };
-        let body = serde_json::to_string(&body).unwrap();
         let response = client
             .post("http://127.0.0.1:10001/generate_proofs")
             .header("Content-Type", "application/json")
-            .body(body)
+            .json(&body)
             .send()
             .await
             .expect("failed to generate proofs");
-        println!("response {:?}", response);
         assert!(response.status().is_success());
+        let rep: GenerateProofRep = response.json().await.unwrap();
+        if let Some(proof) = rep.spend_proofs.first() {
+            let proof: Proof<Bls12> = Proof::read(&proof[..]).unwrap();
+            println!("response proof {:?}", proof);
+        }
     }
 }

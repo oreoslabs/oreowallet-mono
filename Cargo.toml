@@ -25,6 +25,15 @@ ironfish_rust = { package = "ironfish", git = "https://github.com/oreoslabs/iron
 ironfish_zkp = { package = "ironfish_zkp", git = "https://github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm"}
 # ironfish_zkp = { package = "ironfish_zkp", path = "../ironfish/ironfish-zkp"}
 blst = "=0.3.10"
+blstrs = { version = "0.6.0", features = ["portable"] }
+bellperson = { git = "https://github.com/iron-fish/bellperson.git", branch = "blstrs", features = ["groth16"] }
+rand = "0.8.5"
+getrandom = { version = "0.2", features = ["js"] }
+rand_core = { version = "0.6.4", features = ["getrandom"] }
 
 [dev-dependencies]
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+jubjub = { git = "https://github.com/oreoslabs/jubjub.git", branch = "blstrs" }
+zcash_primitives = { git = "https://github.com/oreoslabs/librustzcash.git", branch = "blstrs", package = "zcash_primitives" }
+ff = "0.12.0"
+group = "0.12.0"

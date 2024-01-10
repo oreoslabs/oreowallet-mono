@@ -1,4 +1,3 @@
-use ironfish_zkp::proofs::Spend;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -15,8 +14,12 @@ pub struct ImportAccountRep {
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GenerateProofReuqest {
-    pub circuits: Vec<u32>,
-    // pub spends: Vec<Spend>,
+#[derive(Serialize, Deserialize)]
+pub struct GenerateProofReq {
+    pub spends: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GenerateProofRep {
+    pub spend_proofs: Vec<Vec<u8>>,
 }
