@@ -103,6 +103,7 @@ pub async fn handle_signals() -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use axum::response::IntoResponse;
     use bellperson::groth16::Proof;
     use blstrs::Bls12;
     use ff::{Field, PrimeField, PrimeFieldBits};
@@ -323,13 +324,18 @@ mod tests {
             .await
             .expect("failed to generate proofs");
 
-        let status = response.status();
+        let status1 = response.status();
+        assert!(status1.is_success());
+
         let error = response.json::<OreoError>().await.unwrap();
-        println!("response error {:?}", error.to_string());
+        let error_msg = error.to_string();
         assert_eq!(
-            error.to_string(),
+            error_msg,
             OreoError::GenerateSpendProofFailed(1).to_string()
         );
-        assert!(status.is_success());
+
+        let response = error.into_response();
+        let status = response.status();
+        assert_eq!(status.as_u16(), 900);
     }
 }
