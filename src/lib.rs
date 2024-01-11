@@ -116,6 +116,7 @@ mod tests {
     use zcash_primitives::constants::VALUE_COMMITMENT_VALUE_GENERATOR;
     use zcash_primitives::sapling::{pedersen_hash, Note, ProofGenerationKey, Rseed};
 
+    use crate::error::OreoError;
     use crate::web_handlers::abi::{GenerateProofRep, GenerateProofReq};
 
     fn build_spend() -> Spend {
@@ -294,19 +295,23 @@ mod tests {
     async fn generate_proofs_failed() {
         let client = reqwest::Client::new();
         let spend = build_spend();
+        let spend2 = build_spend();
         let output = build_output();
         let mint_asset = build_mint_asset();
         let mut spend_bytes = vec![];
         spend.write(&mut spend_bytes).unwrap();
+        let mut spend2_bytes = vec![];
+        spend2.write(&mut spend2_bytes).unwrap();
         let mut output_bytes = vec![];
         output.write(&mut output_bytes).unwrap();
         let mut mint_asset_bytes = vec![];
         mint_asset.write(&mut mint_asset_bytes).unwrap();
-        // spend_bytes.truncate(100);
-        // output_bytes.truncate(200);
-        mint_asset_bytes.truncate(200);
+
+        // make spend2 circuit fail to generate a proof
+        spend2_bytes.truncate(100);
+
         let body = GenerateProofReq {
-            spend_circuits: vec![spend_bytes],
+            spend_circuits: vec![spend_bytes, spend2_bytes],
             output_circuits: vec![output_bytes],
             mint_asset_circuits: vec![mint_asset_bytes],
         };
@@ -317,6 +322,14 @@ mod tests {
             .send()
             .await
             .expect("failed to generate proofs");
-        assert!(response.status().is_client_error());
+
+        let status = response.status();
+        let error = response.json::<OreoError>().await.unwrap();
+        println!("response error {:?}", error.to_string());
+        assert_eq!(
+            error.to_string(),
+            OreoError::GenerateSpendProofFailed(1).to_string()
+        );
+        assert!(status.is_success());
     }
 }
