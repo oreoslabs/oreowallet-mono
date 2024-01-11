@@ -14,12 +14,16 @@ pub struct ImportAccountRep {
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GenerateProofReq {
-    pub spends: Vec<Vec<u8>>,
+    pub spend_circuits: Vec<Vec<u8>>,
+    pub output_circuits: Vec<Vec<u8>>,
+    pub mint_asset_circuits: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GenerateProofRep {
     pub spend_proofs: Vec<Vec<u8>>,
+    pub output_proofs: Vec<Vec<u8>>,
+    pub mint_asset_proofs: Vec<Vec<u8>>,
 }

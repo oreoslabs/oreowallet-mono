@@ -108,8 +108,11 @@ mod tests {
     use ff::{Field, PrimeField, PrimeFieldBits};
     use group::{Curve, Group};
     use ironfish_zkp::constants::PUBLIC_KEY_GENERATOR;
-    use ironfish_zkp::util::commitment_full_point;
+    use ironfish_zkp::proofs::{MintAsset, Output};
+    use ironfish_zkp::util::{asset_hash_to_point, commitment_full_point};
     use ironfish_zkp::{primitives::ValueCommitment, proofs::Spend};
+    use jubjub::ExtendedPoint;
+    use rand::Rng;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
     use zcash_primitives::constants::VALUE_COMMITMENT_VALUE_GENERATOR;
     use zcash_primitives::sapling::{pedersen_hash, Note, ProofGenerationKey, Rseed};
@@ -193,15 +196,94 @@ mod tests {
         }
     }
 
+    fn build_output() -> Output {
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut asset_id = [0u8; 32];
+        let asset_generator = loop {
+            rng.fill(&mut asset_id[..]);
+
+            if let Some(point) = asset_hash_to_point(&asset_id) {
+                break point;
+            }
+        };
+        let value_commitment_randomness = jubjub::Fr::random(&mut rng);
+        let note_commitment_randomness = jubjub::Fr::random(&mut rng);
+        let value_commitment = ValueCommitment {
+            value: rng.next_u64(),
+            randomness: value_commitment_randomness,
+            asset_generator,
+        };
+
+        let nsk = jubjub::Fr::random(&mut rng);
+        let ak = jubjub::SubgroupPoint::random(&mut rng);
+        let esk = jubjub::Fr::random(&mut rng);
+        let ar = jubjub::Fr::random(&mut rng);
+
+        let proof_generation_key = ProofGenerationKey { ak, nsk };
+
+        let viewing_key = proof_generation_key.to_viewing_key();
+
+        let payment_address = *PUBLIC_KEY_GENERATOR * viewing_key.ivk().0;
+
+        let sender_address = payment_address;
+
+        let rk = jubjub::ExtendedPoint::from(viewing_key.rk(ar)).to_affine();
+
+        Output {
+            value_commitment: Some(value_commitment.clone()),
+            payment_address: Some(payment_address),
+            commitment_randomness: Some(note_commitment_randomness),
+            esk: Some(esk),
+            asset_id,
+            proof_generation_key: Some(proof_generation_key.clone()),
+            ar: Some(ar),
+        }
+    }
+
+    fn build_mint_asset() -> MintAsset {
+        let mut rng = StdRng::seed_from_u64(0);
+        let proof_generation_key = ProofGenerationKey {
+            ak: jubjub::SubgroupPoint::random(&mut rng),
+            nsk: jubjub::Fr::random(&mut rng),
+        };
+        let incoming_view_key = proof_generation_key.to_viewing_key();
+        let public_address = *PUBLIC_KEY_GENERATOR * incoming_view_key.ivk().0;
+        let public_address_point = ExtendedPoint::from(public_address).to_affine();
+
+        let public_key_randomness = jubjub::Fr::random(&mut rng);
+        let randomized_public_key =
+            ExtendedPoint::from(incoming_view_key.rk(public_key_randomness)).to_affine();
+
+        let public_inputs = vec![
+            randomized_public_key.get_u(),
+            randomized_public_key.get_v(),
+            public_address_point.get_u(),
+            public_address_point.get_v(),
+        ];
+
+        // Mint proof
+        MintAsset {
+            proof_generation_key: Some(proof_generation_key),
+            public_key_randomness: Some(public_key_randomness),
+        }
+    }
+
     #[tokio::test]
     async fn generate_proofs_works() {
         let client = reqwest::Client::new();
         let spend = build_spend();
-        println!("payment address: {:?}", spend.payment_address);
-        let mut writer = vec![];
-        spend.write(&mut writer).unwrap();
+        let output = build_output();
+        let mint_asset = build_mint_asset();
+        let mut spend_bytes = vec![];
+        spend.write(&mut spend_bytes).unwrap();
+        let mut output_bytes = vec![];
+        output.write(&mut output_bytes).unwrap();
+        let mut mint_asset_bytes = vec![];
+        mint_asset.write(&mut mint_asset_bytes).unwrap();
         let body = GenerateProofReq {
-            spends: vec![writer],
+            spend_circuits: vec![spend_bytes],
+            output_circuits: vec![output_bytes],
+            mint_asset_circuits: vec![mint_asset_bytes],
         };
         let response = client
             .post("http://127.0.0.1:10001/generate_proofs")
@@ -214,7 +296,15 @@ mod tests {
         let rep: GenerateProofRep = response.json().await.unwrap();
         if let Some(proof) = rep.spend_proofs.first() {
             let proof: Proof<Bls12> = Proof::read(&proof[..]).unwrap();
-            println!("response proof {:?}", proof);
+            println!("response first spend proof {:?}", proof);
+        }
+        if let Some(proof) = rep.output_proofs.first() {
+            let proof: Proof<Bls12> = Proof::read(&proof[..]).unwrap();
+            println!("response first output proof {:?}", proof);
+        }
+        if let Some(proof) = rep.mint_asset_proofs.first() {
+            let proof: Proof<Bls12> = Proof::read(&proof[..]).unwrap();
+            println!("response first mint asset proof {:?}", proof);
         }
     }
 }
