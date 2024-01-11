@@ -111,7 +111,6 @@ mod tests {
     use ironfish_zkp::proofs::{MintAsset, Output};
     use ironfish_zkp::util::{asset_hash_to_point, commitment_full_point};
     use ironfish_zkp::{primitives::ValueCommitment, proofs::Spend};
-    use jubjub::ExtendedPoint;
     use rand::Rng;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
     use zcash_primitives::constants::VALUE_COMMITMENT_VALUE_GENERATOR;
@@ -225,10 +224,6 @@ mod tests {
 
         let payment_address = *PUBLIC_KEY_GENERATOR * viewing_key.ivk().0;
 
-        let sender_address = payment_address;
-
-        let rk = jubjub::ExtendedPoint::from(viewing_key.rk(ar)).to_affine();
-
         Output {
             value_commitment: Some(value_commitment.clone()),
             payment_address: Some(payment_address),
@@ -246,22 +241,9 @@ mod tests {
             ak: jubjub::SubgroupPoint::random(&mut rng),
             nsk: jubjub::Fr::random(&mut rng),
         };
-        let incoming_view_key = proof_generation_key.to_viewing_key();
-        let public_address = *PUBLIC_KEY_GENERATOR * incoming_view_key.ivk().0;
-        let public_address_point = ExtendedPoint::from(public_address).to_affine();
 
         let public_key_randomness = jubjub::Fr::random(&mut rng);
-        let randomized_public_key =
-            ExtendedPoint::from(incoming_view_key.rk(public_key_randomness)).to_affine();
 
-        let public_inputs = vec![
-            randomized_public_key.get_u(),
-            randomized_public_key.get_v(),
-            public_address_point.get_u(),
-            public_address_point.get_v(),
-        ];
-
-        // Mint proof
         MintAsset {
             proof_generation_key: Some(proof_generation_key),
             public_key_randomness: Some(public_key_randomness),
@@ -306,5 +288,35 @@ mod tests {
             let proof: Proof<Bls12> = Proof::read(&proof[..]).unwrap();
             println!("response first mint asset proof {:?}", proof);
         }
+    }
+
+    #[tokio::test]
+    async fn generate_proofs_failed() {
+        let client = reqwest::Client::new();
+        let spend = build_spend();
+        let output = build_output();
+        let mint_asset = build_mint_asset();
+        let mut spend_bytes = vec![];
+        spend.write(&mut spend_bytes).unwrap();
+        let mut output_bytes = vec![];
+        output.write(&mut output_bytes).unwrap();
+        let mut mint_asset_bytes = vec![];
+        mint_asset.write(&mut mint_asset_bytes).unwrap();
+        // spend_bytes.truncate(100);
+        // output_bytes.truncate(200);
+        mint_asset_bytes.truncate(200);
+        let body = GenerateProofReq {
+            spend_circuits: vec![spend_bytes],
+            output_circuits: vec![output_bytes],
+            mint_asset_circuits: vec![mint_asset_bytes],
+        };
+        let response = client
+            .post("http://127.0.0.1:10001/generate_proofs")
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .expect("failed to generate proofs");
+        assert!(response.status().is_client_error());
     }
 }
