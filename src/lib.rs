@@ -19,8 +19,8 @@ use crate::web_handlers::{
 };
 
 pub mod config;
-
 pub mod db_handler;
+pub mod error;
 pub mod rpc_handler;
 pub mod web_handlers;
 
@@ -63,8 +63,8 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
         );
 
     let listener = TcpListener::bind(&listen).await?;
-    axum::serve(listener, router).await?;
     info!("Server listening on {}", listen);
+    axum::serve(listener, router).await?;
     Ok(())
 }
 
