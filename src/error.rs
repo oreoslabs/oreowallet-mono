@@ -1,8 +1,10 @@
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
+    Json,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use thiserror::Error;
 
 #[derive(Debug, Error, Serialize, Deserialize)]
@@ -46,6 +48,6 @@ impl IntoResponse for OreoError {
                 (StatusCode::from_u16(902).unwrap(), self.to_string())
             }
         };
-        (status_code, err_msg).into_response()
+        Json(json!({"code": status_code.as_u16(), "error": err_msg})).into_response()
     }
 }
