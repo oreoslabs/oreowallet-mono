@@ -23,7 +23,7 @@ impl RpcHandler {
     }
 
     pub async fn import_view_only(&self, req: ImportAccountReq) -> Result<ImportAccountRep> {
-        let path = format!("{}/wallet/importAccount", self.endpoint);
+        let path = format!("http://{}/wallet/importAccount", self.endpoint);
         let resp: RpcResponse<ImportAccountRep> = self
             .agent
             .clone()
@@ -34,7 +34,7 @@ impl RpcHandler {
     }
 
     pub async fn get_balance(&self, req: GetBalancesReq) -> Result<GetBalancesRep> {
-        let path = format!("{}/wallet/getBalances", self.endpoint);
+        let path = format!("http://{}/wallet/getBalances", self.endpoint);
         let resp: RpcResponse<GetBalancesRep> = self
             .agent
             .clone()
@@ -48,7 +48,7 @@ impl RpcHandler {
         &self,
         req: GetTransactionsReq,
     ) -> Result<Vec<TransactionStatus>> {
-        let path = format!("{}/wallet/getAccountTransactions", self.endpoint);
+        let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp: RpcResponse<Vec<TransactionStatus>> = self
             .agent
             .clone()
@@ -59,7 +59,7 @@ impl RpcHandler {
     }
 
     pub async fn create_transaction(&self, req: CreateTxReq) -> Result<CreateTxRep> {
-        let path = format!("{}/wallet/createTransaction", self.endpoint);
+        let path = format!("http://{}/wallet/createTransaction", self.endpoint);
         let resp: RpcResponse<CreateTxRep> = self
             .agent
             .clone()
@@ -70,7 +70,7 @@ impl RpcHandler {
     }
 
     pub async fn broadcast_transaction(&self, req: BroadcastTxReq) -> Result<BroadcastTxRep> {
-        let path = format!("{}/chain/broadcastTransaction", self.endpoint);
+        let path = format!("http://{}/chain/broadcastTransaction", self.endpoint);
         let resp: RpcResponse<BroadcastTxRep> = self
             .agent
             .clone()
