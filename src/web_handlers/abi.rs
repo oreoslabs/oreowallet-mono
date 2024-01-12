@@ -1,5 +1,6 @@
-use axum::Json;
 use serde::{Deserialize, Serialize};
+
+use crate::rpc_handler::abi::CreateAccountOpt;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -8,6 +9,7 @@ pub struct ImportAccountReq {
     pub incoming_view_key: String,
     pub outgoing_view_key: String,
     pub public_address: String,
+    pub created_at: Option<CreateAccountOpt>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

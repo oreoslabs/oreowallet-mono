@@ -24,6 +24,7 @@ pub async fn import_vk_handler<T: DBHandler>(
         incoming_view_key,
         outgoing_view_key,
         public_address,
+        created_at,
     } = import;
     let account_name = shared
         .db_handler
@@ -38,6 +39,7 @@ pub async fn import_vk_handler<T: DBHandler>(
         public_address,
         version: ACCOUNT_VERSION,
         name: account_name.clone(),
+        created_at,
     };
     let res = shared.rpc_handler.import_view_only(rpc_data).await.unwrap();
     Json(res)

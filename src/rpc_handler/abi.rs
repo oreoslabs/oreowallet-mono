@@ -7,6 +7,12 @@ pub struct RpcResponse<T> {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct CreateAccountOpt {
+    pub hash: String,
+    pub sequence: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportAccountReq {
     pub version: u8,
@@ -15,6 +21,7 @@ pub struct ImportAccountReq {
     pub incoming_view_key: String,
     pub outgoing_view_key: String,
     pub public_address: String,
+    pub created_at: Option<CreateAccountOpt>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

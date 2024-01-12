@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use axum::{extract, http::StatusCode, Json};
+use axum::{extract, Json};
 use bellperson::groth16;
 use ironfish_rust::sapling_bls12::SAPLING;
 use ironfish_zkp::proofs::{MintAsset, Output, Spend};

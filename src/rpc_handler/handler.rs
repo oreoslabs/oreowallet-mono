@@ -28,7 +28,7 @@ impl RpcHandler {
             .agent
             .clone()
             .post(&path)
-            .send_json(ureq::json!(req))?
+            .send_json(ureq::json!({"account": req}))?
             .into_json()?;
         Ok(resp.data)
     }
