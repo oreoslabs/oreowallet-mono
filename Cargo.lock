@@ -1382,7 +1382,7 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 [[package]]
 name = "ironfish"
 version = "0.3.0"
-source = "git+https://github.com/oreoslabs/ironfish-optimize.git?branch=feature/support-wasm#685bf477fbf78460ee9f4110f79caa5d37a0836b"
+source = "git+ssh://github.com/oreoslabs/ironfish-optimize.git?branch=feature/support-wasm#685bf477fbf78460ee9f4110f79caa5d37a0836b"
 dependencies = [
  "bellperson",
  "blake2b_simd",
@@ -1443,7 +1443,7 @@ dependencies = [
 [[package]]
 name = "ironfish_zkp"
 version = "0.2.0"
-source = "git+https://github.com/oreoslabs/ironfish-optimize.git?branch=feature/support-wasm#685bf477fbf78460ee9f4110f79caa5d37a0836b"
+source = "git+ssh://github.com/oreoslabs/ironfish-optimize.git?branch=feature/support-wasm#685bf477fbf78460ee9f4110f79caa5d37a0836b"
 dependencies = [
  "bellperson",
  "blake2s_simd",

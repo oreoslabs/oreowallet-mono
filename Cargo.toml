@@ -20,13 +20,13 @@ tower-http = { version = "0.5.0", features = ["cors"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 ureq = { version = "2.9.1", features = ["json"] }
-ironfish_rust = { package = "ironfish", git = "https://github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm"}
+ironfish_rust = { package = "ironfish", git = "ssh://git@github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm"}
 # ironfish_rust = { package = "ironfish", path = "../ironfish/ironfish-rust"}
-ironfish_zkp = { package = "ironfish_zkp", git = "https://github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm"}
+ironfish_zkp = { package = "ironfish_zkp", git = "ssh://git@github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm"}
 # ironfish_zkp = { package = "ironfish_zkp", path = "../ironfish/ironfish-zkp"}
 blst = "=0.3.10"
 blstrs = { version = "0.6.0", features = ["portable"] }
-bellperson = { git = "https://github.com/iron-fish/bellperson.git", branch = "blstrs", features = ["groth16"] }
+bellperson = { git = "ssh://git@github.com/iron-fish/bellperson.git", branch = "blstrs", features = ["groth16"] }
 rand = "0.8.5"
 getrandom = { version = "0.2", features = ["js"] }
 rand_core = { version = "0.6.4", features = ["getrandom"] }
@@ -34,7 +34,7 @@ rayon = "1.5"
 
 [dev-dependencies]
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
-jubjub = { git = "https://github.com/oreoslabs/jubjub.git", branch = "blstrs" }
-zcash_primitives = { git = "https://github.com/oreoslabs/librustzcash.git", branch = "blstrs", package = "zcash_primitives" }
+jubjub = { git = "ssh://git@github.com/oreoslabs/jubjub.git", branch = "blstrs" }
+zcash_primitives = { git = "ssh://git@github.com/oreoslabs/librustzcash.git", branch = "blstrs", package = "zcash_primitives" }
 ff = "0.12.0"
 group = "0.12.0"
