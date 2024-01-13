@@ -3,6 +3,8 @@ use std::time::Duration;
 use anyhow::Result;
 use ureq::{Agent, AgentBuilder};
 
+use crate::web_handlers::abi::{GetAccountStatusRep, GetAccountStatusReq, GetLatestBlockRep};
+
 use super::abi::*;
 
 #[derive(Debug, Clone)]
@@ -77,6 +79,27 @@ impl RpcHandler {
             .post(&path)
             .send_json(ureq::json!(req))?
             .into_json()?;
+        Ok(resp.data)
+    }
+
+    pub async fn get_account_status(
+        &self,
+        req: GetAccountStatusReq,
+    ) -> Result<GetAccountStatusRep> {
+        let path = format!("http://{}/wallet/getAccountStatus", self.endpoint);
+        let resp: RpcResponse<GetAccountStatusRep> = self
+            .agent
+            .clone()
+            .post(&path)
+            .send_json(ureq::json!(req))?
+            .into_json()?;
+        Ok(resp.data)
+    }
+
+    pub async fn get_latest_block(&self) -> Result<GetLatestBlockRep> {
+        let path = format!("http://{}/chain/getChainInfo", self.endpoint);
+        let resp: RpcResponse<GetLatestBlockRep> =
+            self.agent.clone().get(&path).call()?.into_json()?;
         Ok(resp.data)
     }
 }

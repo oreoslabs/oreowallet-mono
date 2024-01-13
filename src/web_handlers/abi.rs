@@ -30,3 +30,26 @@ pub struct GenerateProofRep {
     pub output_proofs: Vec<Vec<u8>>,
     pub mint_asset_proofs: Vec<Vec<u8>>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetAccountStatusReq {
+    pub account: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetAccountStatusRep {
+    pub name: String,
+    pub head: Option<CreateAccountOpt>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BlockIdentifier {
+    pub index: String,
+    pub hash: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetLatestBlockRep {
+    pub current_block_identifier: BlockIdentifier,
+}

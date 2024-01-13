@@ -244,6 +244,33 @@ checksum = "cf9ff0bbfd639f15c74af777d81383cf53efb7c93613f6cab67c6c11e05bbf8b"
 [[package]]
 name = "bellperson"
 version = "0.24.1"
+source = "git+ssh://git@github.com/iron-fish/bellperson.git?branch=blstrs#37b9976bcd96986cbdc71ae09fc455015e3dfac0"
+dependencies = [
+ "bincode",
+ "blake2s_simd",
+ "blstrs",
+ "byteorder",
+ "crossbeam-channel",
+ "digest 0.10.7",
+ "ec-gpu",
+ "ec-gpu-gen",
+ "ff",
+ "group",
+ "log",
+ "memmap2",
+ "pairing",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "rayon",
+ "rustversion",
+ "serde",
+ "sha2 0.10.8",
+ "thiserror",
+]
+
+[[package]]
+name = "bellperson"
+version = "0.24.1"
 source = "git+https://github.com/iron-fish/bellperson.git?branch=blstrs#37b9976bcd96986cbdc71ae09fc455015e3dfac0"
 dependencies = [
  "bincode",
@@ -827,6 +854,15 @@ dependencies = [
 [[package]]
 name = "equihash"
 version = "0.2.0"
+source = "git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
+dependencies = [
+ "blake2b_simd",
+ "byteorder",
+]
+
+[[package]]
+name = "equihash"
+version = "0.2.0"
 source = "git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
 dependencies = [
  "blake2b_simd",
@@ -885,6 +921,14 @@ name = "execute-command-tokens"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69dc321eb6be977f44674620ca3aa21703cb20ffbe560e1ae97da08401ffbcad"
+
+[[package]]
+name = "f4jumble"
+version = "0.1.0"
+source = "git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
+dependencies = [
+ "blake2b_simd",
+]
 
 [[package]]
 name = "f4jumble"
@@ -1382,9 +1426,9 @@ checksum = "8f518f335dce6725a761382244631d86cf0ccb2863413590b31338feb467f9c3"
 [[package]]
 name = "ironfish"
 version = "0.3.0"
-source = "git+ssh://github.com/oreoslabs/ironfish-optimize.git?branch=feature/support-wasm#685bf477fbf78460ee9f4110f79caa5d37a0836b"
+source = "git+ssh://git@github.com/oreoslabs/ironfish-optimize.git?branch=feature/support-wasm#c31ee6622fcd65df868e13bef5def6d4a377e91d"
 dependencies = [
- "bellperson",
+ "bellperson 0.24.1 (git+https://github.com/iron-fish/bellperson.git?branch=blstrs)",
  "blake2b_simd",
  "blake2s_simd",
  "blake3",
@@ -1412,7 +1456,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "bellperson",
+ "bellperson 0.24.1 (git+ssh://git@github.com/iron-fish/bellperson.git?branch=blstrs)",
  "blst",
  "blstrs",
  "clap",
@@ -1421,7 +1465,7 @@ dependencies = [
  "group",
  "ironfish",
  "ironfish_zkp",
- "jubjub 0.9.0 (git+https://github.com/oreoslabs/jubjub.git?branch=blstrs)",
+ "jubjub 0.9.0 (git+ssh://git@github.com/oreoslabs/jubjub.git?branch=blstrs)",
  "r2d2_redis",
  "rand 0.8.5",
  "rand_core 0.6.4",
@@ -1437,15 +1481,15 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ureq",
- "zcash_primitives",
+ "zcash_primitives 0.7.0 (git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs)",
 ]
 
 [[package]]
 name = "ironfish_zkp"
 version = "0.2.0"
-source = "git+ssh://github.com/oreoslabs/ironfish-optimize.git?branch=feature/support-wasm#685bf477fbf78460ee9f4110f79caa5d37a0836b"
+source = "git+ssh://git@github.com/oreoslabs/ironfish-optimize.git?branch=feature/support-wasm#c31ee6622fcd65df868e13bef5def6d4a377e91d"
 dependencies = [
- "bellperson",
+ "bellperson 0.24.1 (git+https://github.com/iron-fish/bellperson.git?branch=blstrs)",
  "blake2s_simd",
  "blst",
  "blstrs",
@@ -1458,7 +1502,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_core 0.6.4",
  "serde",
- "zcash_primitives",
+ "zcash_primitives 0.7.0 (git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs)",
  "zcash_proofs",
 ]
 
@@ -1493,6 +1537,21 @@ dependencies = [
  "bls12_381",
  "ff",
  "group",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
+name = "jubjub"
+version = "0.9.0"
+source = "git+ssh://git@github.com/oreoslabs/jubjub.git?branch=blstrs#3f864b418d01bf330cefdad04bfd15362971c34b"
+dependencies = [
+ "bitvec",
+ "blst",
+ "blstrs",
+ "ff",
+ "group",
+ "lazy_static",
  "rand_core 0.6.4",
  "subtle",
 ]
@@ -3192,12 +3251,32 @@ dependencies = [
 [[package]]
 name = "zcash_address"
 version = "0.1.0"
+source = "git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
+dependencies = [
+ "bech32",
+ "bs58",
+ "f4jumble 0.1.0 (git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs)",
+ "zcash_encoding 0.1.0 (git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs)",
+]
+
+[[package]]
+name = "zcash_address"
+version = "0.1.0"
 source = "git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
 dependencies = [
  "bech32",
  "bs58",
- "f4jumble",
- "zcash_encoding",
+ "f4jumble 0.1.0 (git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs)",
+ "zcash_encoding 0.1.0 (git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs)",
+]
+
+[[package]]
+name = "zcash_encoding"
+version = "0.1.0"
+source = "git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
+dependencies = [
+ "byteorder",
+ "nonempty",
 ]
 
 [[package]]
@@ -3224,12 +3303,57 @@ dependencies = [
 [[package]]
 name = "zcash_note_encryption"
 version = "0.1.0"
+source = "git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
+dependencies = [
+ "chacha20 0.8.2",
+ "chacha20poly1305 0.9.1",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
+name = "zcash_note_encryption"
+version = "0.1.0"
 source = "git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
 dependencies = [
  "chacha20 0.8.2",
  "chacha20poly1305 0.9.1",
  "rand_core 0.6.4",
  "subtle",
+]
+
+[[package]]
+name = "zcash_primitives"
+version = "0.7.0"
+source = "git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
+dependencies = [
+ "aes",
+ "bip0039",
+ "bitvec",
+ "blake2b_simd",
+ "blake2s_simd",
+ "blst",
+ "blstrs",
+ "byteorder",
+ "chacha20poly1305 0.9.1",
+ "equihash 0.2.0 (git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs)",
+ "ff",
+ "fpe",
+ "group",
+ "hex",
+ "incrementalmerkletree",
+ "jubjub 0.9.0 (git+https://github.com/oreoslabs/jubjub.git?branch=blstrs)",
+ "lazy_static",
+ "memuse",
+ "nonempty",
+ "orchard",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "sha2 0.9.9",
+ "subtle",
+ "zcash_address 0.1.0 (git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs)",
+ "zcash_encoding 0.1.0 (git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs)",
+ "zcash_note_encryption 0.1.0 (git+ssh://git@github.com/oreoslabs/librustzcash.git?branch=blstrs)",
 ]
 
 [[package]]
@@ -3246,7 +3370,7 @@ dependencies = [
  "blstrs",
  "byteorder",
  "chacha20poly1305 0.9.1",
- "equihash",
+ "equihash 0.2.0 (git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs)",
  "ff",
  "fpe",
  "group",
@@ -3261,8 +3385,8 @@ dependencies = [
  "rand_core 0.6.4",
  "sha2 0.9.9",
  "subtle",
- "zcash_address",
- "zcash_encoding",
+ "zcash_address 0.1.0 (git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs)",
+ "zcash_encoding 0.1.0 (git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs)",
  "zcash_note_encryption 0.1.0 (git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs)",
 ]
 
@@ -3271,7 +3395,7 @@ name = "zcash_proofs"
 version = "0.7.1"
 source = "git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs#37c35dbcf7fc35fd321d02f9b38be7f1e6f02bce"
 dependencies = [
- "bellperson",
+ "bellperson 0.24.1 (git+https://github.com/iron-fish/bellperson.git?branch=blstrs)",
  "blake2b_simd",
  "blst",
  "blstrs",
@@ -3284,7 +3408,7 @@ dependencies = [
  "rand_core 0.6.4",
  "redjubjub",
  "tracing",
- "zcash_primitives",
+ "zcash_primitives 0.7.0 (git+https://github.com/oreoslabs/librustzcash.git?branch=blstrs)",
 ]
 
 [[package]]

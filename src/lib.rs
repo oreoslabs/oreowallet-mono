@@ -1,7 +1,12 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Result;
-use axum::{error_handling::HandleErrorLayer, http::StatusCode, routing::post, BoxError, Router};
+use axum::{
+    error_handling::HandleErrorLayer,
+    http::StatusCode,
+    routing::{get, post},
+    BoxError, Router,
+};
 use db_handler::{DBHandler, RedisClient};
 use rpc_handler::RpcHandler;
 use tokio::{
@@ -14,8 +19,9 @@ use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 use crate::web_handlers::{
-    broadcast_transaction_handler, create_transaction_handler, generate_proof_handler,
-    get_balances_handler, get_transactions_handler, import_vk_handler,
+    account_status_handler, broadcast_transaction_handler, create_transaction_handler,
+    generate_proof_handler, get_balances_handler, get_transactions_handler, import_vk_handler,
+    latest_block_handler,
 };
 
 pub mod config;
@@ -52,6 +58,8 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
         .route("/createTx", post(create_transaction_handler))
         .route("/broadcastTx", post(broadcast_transaction_handler))
         .route("/generate_proofs", post(generate_proof_handler))
+        .route("/accountStatus", post(account_status_handler))
+        .route("latestBlock", get(latest_block_handler))
         .with_state(shared_state)
         .layer(
             ServiceBuilder::new()
