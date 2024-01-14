@@ -18,6 +18,7 @@ pub struct ImportAccountRep {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GenerateProofReq {
     pub spend_circuits: Vec<Vec<u8>>,
     pub output_circuits: Vec<Vec<u8>>,
@@ -25,6 +26,7 @@ pub struct GenerateProofReq {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GenerateProofRep {
     pub spend_proofs: Vec<Vec<u8>>,
     pub output_proofs: Vec<Vec<u8>>,

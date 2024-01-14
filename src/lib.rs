@@ -57,7 +57,7 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
         .route("/getTransactions", post(get_transactions_handler))
         .route("/createTx", post(create_transaction_handler))
         .route("/broadcastTx", post(broadcast_transaction_handler))
-        .route("/generate_proofs", post(generate_proof_handler))
+        .route("/generateProofs", post(generate_proof_handler))
         .route("/accountStatus", post(account_status_handler))
         .route("/latestBlock", get(latest_block_handler))
         .with_state(shared_state)
