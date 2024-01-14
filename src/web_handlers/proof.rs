@@ -1,11 +1,12 @@
 use std::sync::{Arc, Mutex};
 
-use axum::{extract, Json};
+use axum::{extract, response::IntoResponse, Json};
 use bellperson::groth16;
 use ironfish_rust::sapling_bls12::SAPLING;
 use ironfish_zkp::proofs::{MintAsset, Output, Spend};
 use rand::thread_rng;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use serde_json::json;
 use tracing::{error, info};
 
 use crate::error::OreoError;
@@ -14,7 +15,7 @@ use super::abi::{GenerateProofRep, GenerateProofReq};
 
 pub async fn generate_proof_handler(
     extract::Json(request): extract::Json<GenerateProofReq>,
-) -> Result<Json<GenerateProofRep>, Json<OreoError>> {
+) -> impl IntoResponse {
     info!("calling generate_proof_handler");
     let failed_index = Arc::new(Mutex::new(0u32));
     let spend_proofs = request
@@ -46,7 +47,7 @@ pub async fn generate_proof_handler(
 
     let idx = *failed_index.lock().unwrap();
     if idx > 0 {
-        return Err(Json(OreoError::GenerateSpendProofFailed(idx - 1)));
+        return OreoError::GenerateSpendProofFailed(idx - 1).into_response();
     }
 
     let output_proofs = request
@@ -78,7 +79,7 @@ pub async fn generate_proof_handler(
 
     let idx = *failed_index.lock().unwrap();
     if idx > 0 {
-        return Err(Json(OreoError::GenerateOutputProofFailed(idx - 1)));
+        return OreoError::GenerateSpendProofFailed(idx - 1).into_response();
     }
 
     let mint_asset_proofs = request
@@ -113,12 +114,14 @@ pub async fn generate_proof_handler(
 
     let idx = *failed_index.lock().unwrap();
     if idx > 0 {
-        return Err(Json(OreoError::GenerateMintAssetProofFailed(idx - 1)));
+        return OreoError::GenerateMintAssetProofFailed(idx - 1).into_response();
     }
 
-    Ok(Json(GenerateProofRep {
+    let proof = GenerateProofRep {
         spend_proofs,
         output_proofs,
         mint_asset_proofs,
-    }))
+    };
+
+    Json(json!({"code": 200, "data": proof})).into_response()
 }
