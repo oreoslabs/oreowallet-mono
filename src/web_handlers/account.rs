@@ -30,15 +30,17 @@ pub async fn import_vk_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .save_account(public_address.clone(), 0)
-        .unwrap();
+        .save_account(public_address.clone(), 0);
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
     let rpc_data = RpcImportReq {
         view_key,
         incoming_view_key,
         outgoing_view_key,
         public_address,
         version: ACCOUNT_VERSION,
-        name: account_name.clone(),
+        name: account_name.unwrap(),
         created_at,
     };
     let res = shared.rpc_handler.import_view_only(rpc_data).await;
@@ -56,12 +58,14 @@ pub async fn get_balances_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(get_balance.account.clone())
-        .unwrap();
+        .get_account(get_balance.account.clone());
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
     let res = shared
         .rpc_handler
         .get_balance(GetBalancesReq {
-            account: account_name,
+            account: account_name.unwrap(),
             confirmations: get_balance.confirmations,
         })
         .await;
@@ -79,12 +83,14 @@ pub async fn get_transactions_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(get_transactions.account.clone())
-        .unwrap();
+        .get_account(get_transactions.account.clone());
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
     let res = shared
         .rpc_handler
         .get_transactions(GetTransactionsReq {
-            account: account_name,
+            account: account_name.unwrap(),
             limit: get_transactions.limit,
         })
         .await;
@@ -102,12 +108,14 @@ pub async fn create_transaction_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(create_transaction.account.clone())
-        .unwrap();
+        .get_account(create_transaction.account.clone());
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
     let res = shared
         .rpc_handler
         .create_transaction(CreateTxReq {
-            account: account_name,
+            account: account_name.unwrap(),
             outputs: create_transaction.outputs,
             fee: Some(create_transaction.fee.unwrap_or("1".into())),
             expiration_delta: Some(create_transaction.expiration_delta.unwrap_or(30)),
@@ -141,12 +149,14 @@ pub async fn account_status_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(account.account.clone())
-        .unwrap();
+        .get_account(account.account.clone());
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
     let res = shared
         .rpc_handler
         .get_account_status(GetAccountStatusReq {
-            account: account_name,
+            account: account_name.unwrap(),
         })
         .await;
     match res {
