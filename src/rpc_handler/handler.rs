@@ -31,10 +31,10 @@ impl RpcHandler {
     pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
         &self,
         resp: Result<Response, Error>,
-    ) -> Result<S, OreoError> {
+    ) -> Result<RpcResponse<S>, OreoError> {
         let res = match resp {
             Ok(response) => match response.into_json::<RpcResponse<S>>() {
-                Ok(data) => Ok(data.data),
+                Ok(data) => Ok(data),
                 Err(e) => Err(RpcError {
                     code: "Unknown".into(),
                     status: 606,
@@ -65,7 +65,7 @@ impl RpcHandler {
     pub async fn import_view_only(
         &self,
         req: ImportAccountReq,
-    ) -> Result<ImportAccountRep, OreoError> {
+    ) -> Result<RpcResponse<ImportAccountRep>, OreoError> {
         let path = format!("http://{}/wallet/importAccount", self.endpoint);
         let resp = self
             .agent
@@ -75,7 +75,10 @@ impl RpcHandler {
         self.handle_response(resp)
     }
 
-    pub async fn get_balance(&self, req: GetBalancesReq) -> Result<GetBalancesRep, OreoError> {
+    pub async fn get_balance(
+        &self,
+        req: GetBalancesReq,
+    ) -> Result<RpcResponse<GetBalancesRep>, OreoError> {
         let path = format!("http://{}/wallet/getBalances", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
@@ -84,13 +87,16 @@ impl RpcHandler {
     pub async fn get_transactions(
         &self,
         req: GetTransactionsReq,
-    ) -> Result<Vec<TransactionStatus>, OreoError> {
+    ) -> Result<RpcResponse<Vec<TransactionStatus>>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
     }
 
-    pub async fn create_transaction(&self, req: CreateTxReq) -> Result<CreateTxRep, OreoError> {
+    pub async fn create_transaction(
+        &self,
+        req: CreateTxReq,
+    ) -> Result<RpcResponse<CreateTxRep>, OreoError> {
         let path = format!("http://{}/wallet/createTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
@@ -99,7 +105,7 @@ impl RpcHandler {
     pub async fn broadcast_transaction(
         &self,
         req: BroadcastTxReq,
-    ) -> Result<BroadcastTxRep, OreoError> {
+    ) -> Result<RpcResponse<BroadcastTxRep>, OreoError> {
         let path = format!("http://{}/chain/broadcastTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
@@ -108,13 +114,13 @@ impl RpcHandler {
     pub async fn get_account_status(
         &self,
         req: GetAccountStatusReq,
-    ) -> Result<GetAccountStatusRep, OreoError> {
+    ) -> Result<RpcResponse<GetAccountStatusRep>, OreoError> {
         let path = format!("http://{}/wallet/getAccountStatus", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
     }
 
-    pub async fn get_latest_block(&self) -> Result<GetLatestBlockRep, OreoError> {
+    pub async fn get_latest_block(&self) -> Result<RpcResponse<GetLatestBlockRep>, OreoError> {
         let path = format!("http://{}/chain/getChainInfo", self.endpoint);
         let resp = self.agent.clone().get(&path).call();
         self.handle_response(resp)

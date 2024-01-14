@@ -1,9 +1,17 @@
+use axum::{response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RpcResponse<T> {
     pub status: u16,
     pub data: T,
+}
+
+impl<T: Serialize> IntoResponse for RpcResponse<T> {
+    fn into_response(self) -> axum::response::Response {
+        Json(json!({"code": 200, "data": self.data})).into_response()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
