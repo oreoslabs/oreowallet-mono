@@ -19,34 +19,37 @@ pub enum OreoError {
     Syncing,
     #[error("Internal db error")]
     DBError,
-    #[error("Ironfish rpc error")]
-    RpcError,
+    #[error("Internal Ironfish rpc error")]
+    InternalRpcError,
     #[error("The `{0}` spend circuit can not generate proof")]
     GenerateSpendProofFailed(u32),
     #[error("The `{0}` output circuit can not generate proof")]
     GenerateOutputProofFailed(u32),
     #[error("The `{0}` mint asset circuit can not generate proof")]
     GenerateMintAssetProofFailed(u32),
+    #[error("Balance not enough")]
+    BalanceNotEnough,
 }
 
 impl IntoResponse for OreoError {
     fn into_response(self) -> Response {
         let (status_code, err_msg) = match self {
-            OreoError::DBError => (StatusCode::from_u16(700).unwrap(), self.to_string()),
-            OreoError::Duplicate(_) => todo!(),
-            OreoError::NoImported(_) => todo!(),
-            OreoError::Scanning(_) => todo!(),
-            OreoError::Syncing => todo!(),
-            OreoError::RpcError => todo!(),
+            OreoError::DBError => (StatusCode::from_u16(600).unwrap(), self.to_string()),
+            OreoError::Duplicate(_) => (StatusCode::from_u16(601).unwrap(), self.to_string()),
+            OreoError::NoImported(_) => (StatusCode::from_u16(602).unwrap(), self.to_string()),
+            OreoError::Scanning(_) => (StatusCode::from_u16(603).unwrap(), self.to_string()),
+            OreoError::Syncing => (StatusCode::from_u16(604).unwrap(), self.to_string()),
+            OreoError::InternalRpcError => (StatusCode::from_u16(605).unwrap(), self.to_string()),
             OreoError::GenerateSpendProofFailed(_) => {
-                (StatusCode::from_u16(900).unwrap(), self.to_string())
+                (StatusCode::from_u16(606).unwrap(), self.to_string())
             }
             OreoError::GenerateOutputProofFailed(_) => {
-                (StatusCode::from_u16(901).unwrap(), self.to_string())
+                (StatusCode::from_u16(607).unwrap(), self.to_string())
             }
             OreoError::GenerateMintAssetProofFailed(_) => {
-                (StatusCode::from_u16(902).unwrap(), self.to_string())
+                (StatusCode::from_u16(608).unwrap(), self.to_string())
             }
+            OreoError::BalanceNotEnough => (StatusCode::from_u16(609).unwrap(), self.to_string()),
         };
         Json(json!({"code": status_code.as_u16(), "error": err_msg})).into_response()
     }

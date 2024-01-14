@@ -1,9 +1,13 @@
-use std::time::Duration;
+use std::{fmt::Debug, time::Duration};
 
 use serde::Deserialize;
+use tracing::debug;
 use ureq::{Agent, AgentBuilder, Error, Response};
 
-use crate::web_handlers::abi::{GetAccountStatusRep, GetAccountStatusReq, GetLatestBlockRep};
+use crate::{
+    error::OreoError,
+    web_handlers::abi::{GetAccountStatusRep, GetAccountStatusReq, GetLatestBlockRep},
+};
 
 use super::{abi::*, RpcError};
 
@@ -24,11 +28,11 @@ impl RpcHandler {
         }
     }
 
-    pub fn handle_response<S: for<'a> Deserialize<'a>>(
+    pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
         &self,
         resp: Result<Response, Error>,
-    ) -> Result<S, RpcError> {
-        match resp {
+    ) -> Result<S, OreoError> {
+        let res = match resp {
             Ok(response) => match response.into_json::<RpcResponse<S>>() {
                 Ok(data) => Ok(data.data),
                 Err(e) => Err(RpcError {
@@ -48,15 +52,20 @@ impl RpcHandler {
             Err(e) => Err(RpcError {
                 code: "Unknown".into(),
                 status: 606,
-                message: "e".to_string(),
+                message: e.to_string(),
             }),
+        };
+        debug!("Handle rpc response: {:?}", res);
+        match res {
+            Ok(data) => Ok(data),
+            Err(e) => Err(OreoError::try_from(e).unwrap()),
         }
     }
 
     pub async fn import_view_only(
         &self,
         req: ImportAccountReq,
-    ) -> Result<ImportAccountRep, RpcError> {
+    ) -> Result<ImportAccountRep, OreoError> {
         let path = format!("http://{}/wallet/importAccount", self.endpoint);
         let resp = self
             .agent
@@ -66,7 +75,7 @@ impl RpcHandler {
         self.handle_response(resp)
     }
 
-    pub async fn get_balance(&self, req: GetBalancesReq) -> Result<GetBalancesRep, RpcError> {
+    pub async fn get_balance(&self, req: GetBalancesReq) -> Result<GetBalancesRep, OreoError> {
         let path = format!("http://{}/wallet/getBalances", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
@@ -75,13 +84,13 @@ impl RpcHandler {
     pub async fn get_transactions(
         &self,
         req: GetTransactionsReq,
-    ) -> Result<Vec<TransactionStatus>, RpcError> {
+    ) -> Result<Vec<TransactionStatus>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
     }
 
-    pub async fn create_transaction(&self, req: CreateTxReq) -> Result<CreateTxRep, RpcError> {
+    pub async fn create_transaction(&self, req: CreateTxReq) -> Result<CreateTxRep, OreoError> {
         let path = format!("http://{}/wallet/createTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
@@ -90,7 +99,7 @@ impl RpcHandler {
     pub async fn broadcast_transaction(
         &self,
         req: BroadcastTxReq,
-    ) -> Result<BroadcastTxRep, RpcError> {
+    ) -> Result<BroadcastTxRep, OreoError> {
         let path = format!("http://{}/chain/broadcastTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
@@ -99,13 +108,13 @@ impl RpcHandler {
     pub async fn get_account_status(
         &self,
         req: GetAccountStatusReq,
-    ) -> Result<GetAccountStatusRep, RpcError> {
+    ) -> Result<GetAccountStatusRep, OreoError> {
         let path = format!("http://{}/wallet/getAccountStatus", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         self.handle_response(resp)
     }
 
-    pub async fn get_latest_block(&self) -> Result<GetLatestBlockRep, RpcError> {
+    pub async fn get_latest_block(&self) -> Result<GetLatestBlockRep, OreoError> {
         let path = format!("http://{}/chain/getChainInfo", self.endpoint);
         let resp = self.agent.clone().get(&path).call();
         self.handle_response(resp)

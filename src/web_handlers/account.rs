@@ -6,6 +6,7 @@ use axum::{
 use crate::{
     config::ACCOUNT_VERSION,
     db_handler::DBHandler,
+    error::OreoError,
     rpc_handler::abi::{
         BroadcastTxRep, BroadcastTxReq, CreateTxRep, CreateTxReq, GetBalancesRep, GetBalancesReq,
         GetTransactionsReq, ImportAccountRep, ImportAccountReq as RpcImportReq, TransactionStatus,
@@ -18,7 +19,7 @@ use super::abi::{GetAccountStatusRep, GetAccountStatusReq, GetLatestBlockRep, Im
 pub async fn import_vk_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(import): extract::Json<ImportAccountReq>,
-) -> Json<ImportAccountRep> {
+) -> Result<Json<ImportAccountRep>, Json<OreoError>> {
     let ImportAccountReq {
         view_key,
         incoming_view_key,
@@ -41,14 +42,17 @@ pub async fn import_vk_handler<T: DBHandler>(
         name: account_name.clone(),
         created_at,
     };
-    let res = shared.rpc_handler.import_view_only(rpc_data).await.unwrap();
-    Json(res)
+    let res = shared.rpc_handler.import_view_only(rpc_data).await;
+    match res {
+        Ok(data) => Ok(Json(data)),
+        Err(e) => Err(Json(e)),
+    }
 }
 
 pub async fn get_balances_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(get_balance): extract::Json<GetBalancesReq>,
-) -> Json<GetBalancesRep> {
+) -> Result<Json<GetBalancesRep>, Json<OreoError>> {
     let account_name = shared
         .db_handler
         .lock()
@@ -61,15 +65,17 @@ pub async fn get_balances_handler<T: DBHandler>(
             account: account_name,
             confirmations: get_balance.confirmations,
         })
-        .await
-        .unwrap();
-    Json(res)
+        .await;
+    match res {
+        Ok(data) => Ok(Json(data)),
+        Err(e) => Err(Json(e)),
+    }
 }
 
 pub async fn get_transactions_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(get_transactions): extract::Json<GetTransactionsReq>,
-) -> Json<Vec<TransactionStatus>> {
+) -> Result<Json<Vec<TransactionStatus>>, Json<OreoError>> {
     let account_name = shared
         .db_handler
         .lock()
@@ -82,15 +88,17 @@ pub async fn get_transactions_handler<T: DBHandler>(
             account: account_name,
             limit: get_transactions.limit,
         })
-        .await
-        .unwrap();
-    Json(res)
+        .await;
+    match res {
+        Ok(data) => Ok(Json(data)),
+        Err(e) => Err(Json(e)),
+    }
 }
 
 pub async fn create_transaction_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(create_transaction): extract::Json<CreateTxReq>,
-) -> Json<CreateTxRep> {
+) -> Result<Json<CreateTxRep>, Json<OreoError>> {
     let account_name = shared
         .db_handler
         .lock()
@@ -105,27 +113,31 @@ pub async fn create_transaction_handler<T: DBHandler>(
             fee: Some(create_transaction.fee.unwrap_or("1".into())),
             expiration_delta: Some(create_transaction.expiration_delta.unwrap_or(30)),
         })
-        .await
-        .unwrap();
-    Json(res)
+        .await;
+    match res {
+        Ok(data) => Ok(Json(data)),
+        Err(e) => Err(Json(e)),
+    }
 }
 
 pub async fn broadcast_transaction_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(broadcast_transaction): extract::Json<BroadcastTxReq>,
-) -> Json<BroadcastTxRep> {
+) -> Result<Json<BroadcastTxRep>, Json<OreoError>> {
     let res = shared
         .rpc_handler
         .broadcast_transaction(broadcast_transaction)
-        .await
-        .unwrap();
-    Json(res)
+        .await;
+    match res {
+        Ok(data) => Ok(Json(data)),
+        Err(e) => Err(Json(e)),
+    }
 }
 
 pub async fn account_status_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(account): extract::Json<GetAccountStatusReq>,
-) -> Json<GetAccountStatusRep> {
+) -> Result<Json<GetAccountStatusRep>, Json<OreoError>> {
     let account_name = shared
         .db_handler
         .lock()
@@ -137,14 +149,19 @@ pub async fn account_status_handler<T: DBHandler>(
         .get_account_status(GetAccountStatusReq {
             account: account_name,
         })
-        .await
-        .unwrap();
-    Json(res)
+        .await;
+    match res {
+        Ok(data) => Ok(Json(data)),
+        Err(e) => Err(Json(e)),
+    }
 }
 
 pub async fn latest_block_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
-) -> Json<GetLatestBlockRep> {
-    let res = shared.rpc_handler.get_latest_block().await.unwrap();
-    Json(res)
+) -> Result<Json<GetLatestBlockRep>, Json<OreoError>> {
+    let res = shared.rpc_handler.get_latest_block().await;
+    match res {
+        Ok(data) => Ok(Json(data)),
+        Err(e) => Err(Json(e)),
+    }
 }
