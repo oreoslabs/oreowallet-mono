@@ -37,9 +37,14 @@ pub struct GetAccountStatusReq {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct GetAccountStatusRep {
+pub struct AccountStatus {
     pub name: String,
     pub head: Option<CreateAccountOpt>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetAccountStatusRep {
+    pub account: AccountStatus,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
