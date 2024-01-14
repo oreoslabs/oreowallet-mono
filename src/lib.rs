@@ -66,13 +66,13 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
                 .layer(HandleErrorLayer::new(|_: BoxError| async {
                     StatusCode::REQUEST_TIMEOUT
                 }))
-                .layer(TimeoutLayer::new(Duration::from_secs(30)))
-                .layer(
-                    CorsLayer::new()
-                        .allow_methods(Any)
-                        .allow_origin(Any)
-                        .allow_headers(Any),
-                ),
+                .layer(TimeoutLayer::new(Duration::from_secs(30))),
+        )
+        .layer(
+            CorsLayer::new()
+                .allow_methods(Any)
+                .allow_origin(Any)
+                .allow_headers(Any),
         );
 
     let listener = TcpListener::bind(&listen).await?;
