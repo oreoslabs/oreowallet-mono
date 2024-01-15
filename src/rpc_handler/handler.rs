@@ -28,40 +28,6 @@ impl RpcHandler {
         }
     }
 
-    pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
-        &self,
-        resp: Result<Response, Error>,
-    ) -> Result<RpcResponse<S>, OreoError> {
-        let res = match resp {
-            Ok(response) => match response.into_json::<RpcResponse<S>>() {
-                Ok(data) => Ok(data),
-                Err(e) => Err(RpcError {
-                    code: "Unknown".into(),
-                    status: 606,
-                    message: e.to_string(),
-                }),
-            },
-            Err(ureq::Error::Status(_code, response)) => match response.into_json::<RpcError>() {
-                Ok(data) => Err(data),
-                Err(e) => Err(RpcError {
-                    code: "Unknown".into(),
-                    status: 606,
-                    message: e.to_string(),
-                }),
-            },
-            Err(e) => Err(RpcError {
-                code: "Unknown".into(),
-                status: 606,
-                message: e.to_string(),
-            }),
-        };
-        debug!("Handle rpc response: {:?}", res);
-        match res {
-            Ok(data) => Ok(data),
-            Err(e) => Err(OreoError::try_from(e).unwrap()),
-        }
-    }
-
     pub async fn import_view_only(
         &self,
         req: ImportAccountReq,
@@ -72,7 +38,7 @@ impl RpcHandler {
             .clone()
             .post(&path)
             .send_json(ureq::json!({"account": req}));
-        self.handle_response(resp)
+        handle_response(resp)
     }
 
     pub async fn get_balance(
@@ -81,7 +47,7 @@ impl RpcHandler {
     ) -> Result<RpcResponse<GetBalancesRep>, OreoError> {
         let path = format!("http://{}/wallet/getBalances", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
-        self.handle_response(resp)
+        handle_response(resp)
     }
 
     pub async fn get_transactions(
@@ -90,7 +56,7 @@ impl RpcHandler {
     ) -> Result<RpcResponse<Vec<TransactionStatus>>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
-        self.handle_response(resp)
+        handle_response(resp)
     }
 
     pub async fn create_transaction(
@@ -99,7 +65,7 @@ impl RpcHandler {
     ) -> Result<RpcResponse<CreateTxRep>, OreoError> {
         let path = format!("http://{}/wallet/createTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
-        self.handle_response(resp)
+        handle_response(resp)
     }
 
     pub async fn broadcast_transaction(
@@ -108,7 +74,7 @@ impl RpcHandler {
     ) -> Result<RpcResponse<BroadcastTxRep>, OreoError> {
         let path = format!("http://{}/chain/broadcastTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
-        self.handle_response(resp)
+        handle_response(resp)
     }
 
     pub async fn get_account_status(
@@ -117,13 +83,13 @@ impl RpcHandler {
     ) -> Result<RpcResponse<GetAccountStatusRep>, OreoError> {
         let path = format!("http://{}/wallet/getAccountStatus", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
-        self.handle_response(resp)
+        handle_response(resp)
     }
 
     pub async fn get_latest_block(&self) -> Result<RpcResponse<GetLatestBlockRep>, OreoError> {
         let path = format!("http://{}/chain/getChainInfo", self.endpoint);
         let resp = self.agent.clone().get(&path).call();
-        self.handle_response(resp)
+        handle_response(resp)
     }
 
     pub async fn get_account_transaction(
@@ -132,6 +98,39 @@ impl RpcHandler {
     ) -> Result<RpcResponse<GetAccountTransactionRep>, OreoError> {
         let path = format!("http://{}/account/getAccountTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
-        self.handle_response(resp)
+        handle_response(resp)
+    }
+}
+
+pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
+    resp: Result<Response, Error>,
+) -> Result<RpcResponse<S>, OreoError> {
+    let res = match resp {
+        Ok(response) => match response.into_json::<RpcResponse<S>>() {
+            Ok(data) => Ok(data),
+            Err(e) => Err(RpcError {
+                code: "Unknown".into(),
+                status: 606,
+                message: e.to_string(),
+            }),
+        },
+        Err(ureq::Error::Status(_code, response)) => match response.into_json::<RpcError>() {
+            Ok(data) => Err(data),
+            Err(e) => Err(RpcError {
+                code: "Unknown".into(),
+                status: 606,
+                message: e.to_string(),
+            }),
+        },
+        Err(e) => Err(RpcError {
+            code: "Unknown".into(),
+            status: 606,
+            message: e.to_string(),
+        }),
+    };
+    debug!("Handle rpc response: {:?}", res);
+    match res {
+        Ok(data) => Ok(data),
+        Err(e) => Err(OreoError::try_from(e).unwrap()),
     }
 }

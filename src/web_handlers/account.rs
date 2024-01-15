@@ -43,11 +43,11 @@ pub async fn import_vk_handler<T: DBHandler>(
         name: account_name.unwrap(),
         created_at,
     };
-    let res = shared.rpc_handler.import_view_only(rpc_data).await;
-    match res {
-        Ok(data) => data.into_response(),
-        Err(e) => e.into_response(),
-    }
+    shared
+        .rpc_handler
+        .import_view_only(rpc_data)
+        .await
+        .into_response()
 }
 
 pub async fn get_balances_handler<T: DBHandler>(
@@ -62,17 +62,14 @@ pub async fn get_balances_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
-    let res = shared
+    shared
         .rpc_handler
         .get_balance(GetBalancesReq {
             account: account_name.unwrap(),
-            confirmations: get_balance.confirmations,
+            confirmations: Some(get_balance.confirmations.unwrap_or(10)),
         })
-        .await;
-    match res {
-        Ok(data) => data.into_response(),
-        Err(e) => e.into_response(),
-    }
+        .await
+        .into_response()
 }
 
 pub async fn get_transactions_handler<T: DBHandler>(
@@ -87,17 +84,14 @@ pub async fn get_transactions_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
-    let res = shared
+    shared
         .rpc_handler
         .get_transactions(GetTransactionsReq {
             account: account_name.unwrap(),
             limit: get_transactions.limit,
         })
-        .await;
-    match res {
-        Ok(data) => data.into_response(),
-        Err(e) => e.into_response(),
-    }
+        .await
+        .into_response()
 }
 
 pub async fn create_transaction_handler<T: DBHandler>(
@@ -112,7 +106,7 @@ pub async fn create_transaction_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
-    let res = shared
+    shared
         .rpc_handler
         .create_transaction(CreateTxReq {
             account: account_name.unwrap(),
@@ -120,25 +114,19 @@ pub async fn create_transaction_handler<T: DBHandler>(
             fee: Some(create_transaction.fee.unwrap_or("1".into())),
             expiration_delta: Some(create_transaction.expiration_delta.unwrap_or(30)),
         })
-        .await;
-    match res {
-        Ok(data) => data.into_response(),
-        Err(e) => e.into_response(),
-    }
+        .await
+        .into_response()
 }
 
 pub async fn broadcast_transaction_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(broadcast_transaction): extract::Json<BroadcastTxReq>,
 ) -> impl IntoResponse {
-    let res = shared
+    shared
         .rpc_handler
         .broadcast_transaction(broadcast_transaction)
-        .await;
-    match res {
-        Ok(data) => data.into_response(),
-        Err(e) => e.into_response(),
-    }
+        .await
+        .into_response()
 }
 
 pub async fn account_status_handler<T: DBHandler>(
@@ -153,26 +141,19 @@ pub async fn account_status_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
-    let res = shared
+    shared
         .rpc_handler
         .get_account_status(GetAccountStatusReq {
             account: account_name.unwrap(),
         })
-        .await;
-    match res {
-        Ok(data) => data.into_response(),
-        Err(e) => e.into_response(),
-    }
+        .await
+        .into_response()
 }
 
 pub async fn latest_block_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
 ) -> impl IntoResponse {
-    let res = shared.rpc_handler.get_latest_block().await;
-    match res {
-        Ok(data) => data.into_response(),
-        Err(e) => e.into_response(),
-    }
+    shared.rpc_handler.get_latest_block().await.into_response()
 }
 
 pub async fn account_transaction_handler<T: DBHandler>(
@@ -187,15 +168,12 @@ pub async fn account_transaction_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
-    let res = shared
+    shared
         .rpc_handler
         .get_account_transaction(GetAccountTransactionReq {
             account: account_name.unwrap(),
             hash: account.hash,
         })
-        .await;
-    match res {
-        Ok(data) => data.into_response(),
-        Err(e) => e.into_response(),
-    }
+        .await
+        .into_response()
 }
