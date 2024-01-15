@@ -105,7 +105,29 @@ pub struct GetTransactionsReq {
 #[serde(rename_all = "camelCase")]
 pub struct TransactionStatus {
     pub hash: String,
+    pub fee: String,
     pub r#type: String,
     pub status: String,
     pub block_sequence: Option<u64>,
+    pub timestamp: String,
+    pub asset_balance_deltas: AssetBalanceDelta,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetAccountTransactionReq {
+    pub account: String,
+    pub hash: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AssetBalanceDelta {
+    pub asset_id: String,
+    pub delta: String,
+    pub asset_name: String,
+}
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetAccountTransactionRep {
+    pub account: String,
+    pub transaction: Option<TransactionStatus>,
 }

@@ -7,7 +7,7 @@ use crate::{
     config::ACCOUNT_VERSION,
     db_handler::DBHandler,
     rpc_handler::abi::{
-        BroadcastTxReq, CreateTxReq, GetBalancesReq, GetTransactionsReq,
+        BroadcastTxReq, CreateTxReq, GetAccountTransactionReq, GetBalancesReq, GetTransactionsReq,
         ImportAccountReq as RpcImportReq,
     },
     SharedState,
@@ -169,6 +169,31 @@ pub async fn latest_block_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
 ) -> impl IntoResponse {
     let res = shared.rpc_handler.get_latest_block().await;
+    match res {
+        Ok(data) => data.into_response(),
+        Err(e) => e.into_response(),
+    }
+}
+
+pub async fn account_transaction_handler<T: DBHandler>(
+    State(shared): State<SharedState<T>>,
+    extract::Json(account): extract::Json<GetAccountTransactionReq>,
+) -> impl IntoResponse {
+    let account_name = shared
+        .db_handler
+        .lock()
+        .await
+        .get_account(account.account.clone());
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
+    let res = shared
+        .rpc_handler
+        .get_account_transaction(GetAccountTransactionReq {
+            account: account_name.unwrap(),
+            hash: account.hash,
+        })
+        .await;
     match res {
         Ok(data) => data.into_response(),
         Err(e) => e.into_response(),

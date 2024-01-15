@@ -125,4 +125,13 @@ impl RpcHandler {
         let resp = self.agent.clone().get(&path).call();
         self.handle_response(resp)
     }
+
+    pub async fn get_account_transaction(
+        &self,
+        req: GetAccountTransactionReq,
+    ) -> Result<RpcResponse<GetAccountTransactionRep>, OreoError> {
+        let path = format!("http://{}/account/getAccountTransaction", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(&req);
+        self.handle_response(resp)
+    }
 }

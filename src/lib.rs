@@ -19,9 +19,9 @@ use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 use crate::web_handlers::{
-    account_status_handler, broadcast_transaction_handler, create_transaction_handler,
-    generate_proof_handler, get_balances_handler, get_transactions_handler, import_vk_handler,
-    latest_block_handler,
+    account_status_handler, account_transaction_handler, broadcast_transaction_handler,
+    create_transaction_handler, generate_proof_handler, get_balances_handler,
+    get_transactions_handler, import_vk_handler, latest_block_handler,
 };
 
 pub mod config;
@@ -54,6 +54,7 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
     let router = Router::new()
         .route("/import", post(import_vk_handler))
         .route("/getBalances", post(get_balances_handler))
+        .route("/getTransaction", post(account_transaction_handler))
         .route("/getTransactions", post(get_transactions_handler))
         .route("/createTx", post(create_transaction_handler))
         .route("/broadcastTx", post(broadcast_transaction_handler))
