@@ -110,8 +110,8 @@ pub struct TransactionStatus {
     pub r#type: String,
     pub status: String,
     pub block_sequence: Option<u64>,
-    pub timestamp: String,
-    pub asset_balance_deltas: AssetBalanceDelta,
+    pub timestamp: u64,
+    pub asset_balance_deltas: Vec<AssetBalanceDelta>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
