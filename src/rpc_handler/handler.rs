@@ -53,7 +53,7 @@ impl RpcHandler {
     pub async fn get_transactions(
         &self,
         req: GetTransactionsReq,
-    ) -> Result<RpcResponse<Vec<TransactionStatus>>, OreoError> {
+    ) -> Result<RpcResponse<GetTransactionsRep>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         handle_response(resp)

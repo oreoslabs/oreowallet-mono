@@ -98,7 +98,8 @@ pub struct BroadcastTxRep {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetTransactionsReq {
     pub account: String,
-    pub limit: u32,
+    pub limit: Option<u32>,
+    pub reverse: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -111,6 +112,12 @@ pub struct TransactionStatus {
     pub block_sequence: Option<u64>,
     pub timestamp: String,
     pub asset_balance_deltas: AssetBalanceDelta,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetTransactionsRep {
+    pub transactions: Vec<TransactionStatus>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -88,7 +88,8 @@ pub async fn get_transactions_handler<T: DBHandler>(
         .rpc_handler
         .get_transactions(GetTransactionsReq {
             account: account_name.unwrap(),
-            limit: get_transactions.limit,
+            limit: Some(get_transactions.limit.unwrap_or(6)),
+            reverse: Some(true),
         })
         .await
         .into_response()
