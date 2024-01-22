@@ -20,13 +20,14 @@ use tracing_subscriber::EnvFilter;
 
 use crate::web_handlers::{
     account_status_handler, account_transaction_handler, broadcast_transaction_handler,
-    create_transaction_handler, generate_proof_handler, get_balances_handler,
+    create_transaction_handler, generate_proof_handler, get_balances_handler, get_ores_handler,
     get_transactions_handler, import_vk_handler, latest_block_handler,
 };
 
 pub mod constants;
 pub mod db_handler;
 pub mod error;
+pub mod orescriptions;
 pub mod rpc_handler;
 pub mod web_handlers;
 
@@ -61,6 +62,7 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
         .route("/generateProofs", post(generate_proof_handler))
         .route("/accountStatus", post(account_status_handler))
         .route("/latestBlock", get(latest_block_handler))
+        .route("/ores", post(get_ores_handler))
         .with_state(shared_state)
         .layer(
             ServiceBuilder::new()

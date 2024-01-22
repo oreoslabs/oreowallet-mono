@@ -82,6 +82,37 @@ pub async fn get_balances_handler<T: DBHandler>(
     }
 }
 
+pub async fn get_ores_handler<T: DBHandler>(
+    State(shared): State<SharedState<T>>,
+    extract::Json(get_balance): extract::Json<GetBalancesReq>,
+) -> impl IntoResponse {
+    let account_name = shared
+        .db_handler
+        .lock()
+        .await
+        .get_account(get_balance.account.clone());
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
+    let resp = shared
+        .rpc_handler
+        .get_balance(GetBalancesReq {
+            account: account_name.unwrap(),
+            confirmations: Some(get_balance.confirmations.unwrap_or(10)),
+        })
+        .await;
+    match resp {
+        Ok(res) => {
+            let response = RpcResponse {
+                status: 200,
+                data: GetBalancesRep::ores(res.data).await,
+            };
+            response.into_response()
+        }
+        Err(e) => e.into_response(),
+    }
+}
+
 pub async fn get_transactions_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(get_transactions): extract::Json<GetTransactionsReq>,

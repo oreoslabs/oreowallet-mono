@@ -2,7 +2,10 @@ use axum::{response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::constants::IRON_NATIVE_ASSET;
+use crate::{
+    constants::IRON_NATIVE_ASSET,
+    orescriptions::{get_ores, is_ores_local, Ores},
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RpcResponse<T> {
@@ -69,10 +72,23 @@ impl GetBalancesRep {
             balances: base
                 .balances
                 .into_iter()
-                .filter(|x| x.asset_verification == "verified")
+                .filter(|x| x.asset_verification == "verified" || x.asset_id == IRON_NATIVE_ASSET)
                 .collect::<Vec<AssetBalance>>(),
             ..base
         }
+    }
+
+    pub async fn ores(base: Self) -> Vec<Ores> {
+        let mut result = vec![];
+        for asset in base.balances.iter() {
+            if !is_ores_local(asset) {
+                continue;
+            }
+            if let Ok(ores) = get_ores(&asset.asset_id).await {
+                result.push(ores);
+            }
+        }
+        result
     }
 }
 
