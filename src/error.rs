@@ -29,6 +29,8 @@ pub enum OreoError {
     GenerateMintAssetProofFailed(u32),
     #[error("Balance not enough")]
     BalanceNotEnough,
+    #[error("Bad mint request")]
+    BadMintRequest,
 }
 
 impl IntoResponse for OreoError {
@@ -50,6 +52,7 @@ impl IntoResponse for OreoError {
                 (StatusCode::from_u16(608).unwrap(), self.to_string())
             }
             OreoError::BalanceNotEnough => (StatusCode::from_u16(609).unwrap(), self.to_string()),
+            OreoError::BadMintRequest => (StatusCode::from_u16(610).unwrap(), self.to_string()),
         };
         Json(json!({"code": status_code.as_u16(), "error": err_msg})).into_response()
     }
