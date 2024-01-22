@@ -6,9 +6,10 @@ use axum::{
 use crate::{
     config::ACCOUNT_VERSION,
     db_handler::DBHandler,
+    error::OreoError,
     rpc_handler::abi::{
         BroadcastTxReq, CreateTxReq, GetAccountTransactionReq, GetBalancesReq, GetTransactionsReq,
-        ImportAccountReq as RpcImportReq,
+        ImportAccountReq as RpcImportReq, OutPut,
     },
     SharedState,
 };
@@ -107,13 +108,30 @@ pub async fn create_transaction_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
+    let outputs: Vec<OutPut> = create_transaction
+        .outputs
+        .unwrap_or(vec![])
+        .iter()
+        .map(|output| OutPut::from(output.clone()))
+        .collect();
+    let mut mints = vec![];
+    for item in create_transaction.mints.unwrap_or(vec![]).into_iter() {
+        if item.asset_id.is_none() && item.name.is_none() {
+            return OreoError::BadMintRequest.into_response();
+        } else {
+            mints.push(item);
+        }
+    }
+    let burns = create_transaction.burns.unwrap_or(vec![]);
     shared
         .rpc_handler
         .create_transaction(CreateTxReq {
             account: account_name.unwrap(),
-            outputs: create_transaction.outputs,
+            outputs: Some(outputs),
             fee: Some(create_transaction.fee.unwrap_or("1".into())),
             expiration_delta: Some(create_transaction.expiration_delta.unwrap_or(30)),
+            mints: Some(mints),
+            burns: Some(burns),
         })
         .await
         .into_response()
