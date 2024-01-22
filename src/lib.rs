@@ -24,7 +24,7 @@ use crate::web_handlers::{
     get_transactions_handler, import_vk_handler, latest_block_handler,
 };
 
-pub mod config;
+pub mod constants;
 pub mod db_handler;
 pub mod error;
 pub mod rpc_handler;

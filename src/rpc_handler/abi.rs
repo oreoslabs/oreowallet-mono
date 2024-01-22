@@ -2,7 +2,7 @@ use axum::{response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::config::IRON_NATIVE_ASSET;
+use crate::constants::IRON_NATIVE_ASSET;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RpcResponse<T> {

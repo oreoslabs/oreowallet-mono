@@ -4,7 +4,7 @@ use axum::{
 };
 
 use crate::{
-    config::ACCOUNT_VERSION,
+    constants::ACCOUNT_VERSION,
     db_handler::DBHandler,
     error::OreoError,
     rpc_handler::abi::{
