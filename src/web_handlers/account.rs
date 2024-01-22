@@ -8,8 +8,8 @@ use crate::{
     db_handler::DBHandler,
     error::OreoError,
     rpc_handler::abi::{
-        BroadcastTxReq, CreateTxReq, GetAccountTransactionReq, GetBalancesReq, GetTransactionsReq,
-        ImportAccountReq as RpcImportReq, OutPut,
+        BroadcastTxReq, CreateTxReq, GetAccountTransactionReq, GetBalancesRep, GetBalancesReq,
+        GetTransactionsReq, ImportAccountReq as RpcImportReq, OutPut, RpcResponse,
     },
     SharedState,
 };
@@ -63,14 +63,23 @@ pub async fn get_balances_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
-    shared
+    let resp = shared
         .rpc_handler
         .get_balance(GetBalancesReq {
             account: account_name.unwrap(),
             confirmations: Some(get_balance.confirmations.unwrap_or(10)),
         })
-        .await
-        .into_response()
+        .await;
+    match resp {
+        Ok(res) => {
+            let response = RpcResponse {
+                status: 200,
+                data: GetBalancesRep::verified_asset(res.data),
+            };
+            response.into_response()
+        }
+        Err(e) => e.into_response(),
+    }
 }
 
 pub async fn get_transactions_handler<T: DBHandler>(

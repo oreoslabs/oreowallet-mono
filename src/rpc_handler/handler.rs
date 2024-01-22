@@ -1,6 +1,7 @@
 use std::{fmt::Debug, time::Duration};
 
 use serde::Deserialize;
+use serde_json::json;
 use tracing::debug;
 use ureq::{Agent, AgentBuilder, Error, Response};
 
@@ -98,6 +99,14 @@ impl RpcHandler {
     ) -> Result<RpcResponse<GetAccountTransactionRep>, OreoError> {
         let path = format!("http://{}/account/getAccountTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
+        handle_response(resp)
+    }
+
+    pub async fn get_asset(&self, id: String) -> Result<RpcResponse<RpcAsset>, OreoError> {
+        let path = format!("http://{}/chain/getAsset", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(&json!({
+            "id": id
+        }));
         handle_response(resp)
     }
 }

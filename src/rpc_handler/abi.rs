@@ -54,12 +54,26 @@ pub struct AssetBalance {
     pub pending: String,
     pub available: String,
     pub sequence: Option<u64>,
+    pub asset_verification: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetBalancesRep {
     pub account: String,
     pub balances: Vec<AssetBalance>,
+}
+
+impl GetBalancesRep {
+    pub fn verified_asset(base: Self) -> Self {
+        Self {
+            balances: base
+                .balances
+                .into_iter()
+                .filter(|x| x.asset_verification == "verified")
+                .collect::<Vec<AssetBalance>>(),
+            ..base
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -169,4 +183,13 @@ pub struct AssetBalanceDelta {
 pub struct GetAccountTransactionRep {
     pub account: String,
     pub transaction: Option<TransactionStatus>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcAsset {
+    pub id: String,
+    pub name: String,
+    pub metadata: String,
+    pub verification: String,
 }
