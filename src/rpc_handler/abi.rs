@@ -214,10 +214,22 @@ pub struct RpcNote {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransactionWithNotes {
+    pub hash: String,
+    pub fee: String,
+    pub r#type: String,
+    pub status: String,
+    pub block_sequence: Option<u64>,
+    pub timestamp: u64,
+    pub asset_balance_deltas: Vec<AssetBalanceDelta>,
+    pub notes: Option<Vec<RpcNote>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct GetAccountTransactionRep {
     pub account: String,
-    pub transaction: Option<TransactionStatus>,
-    pub notes: Option<Vec<RpcNote>>,
+    pub transaction: Option<TransactionWithNotes>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

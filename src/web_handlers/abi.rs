@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     error::OreoError,
     rpc_handler::abi::{
-        AssetBalanceDelta, CreateAccountOpt, GetAccountTransactionRep, RpcNote, TransactionStatus,
+        AssetBalanceDelta, CreateAccountOpt, GetAccountTransactionRep, RpcNote,
+        TransactionWithNotes,
     },
 };
 
@@ -83,10 +84,21 @@ pub struct TransactionDetail {
 }
 
 impl TransactionDetail {
-    pub fn from(notes: Vec<RpcNote>, tx: TransactionStatus) -> Result<Self, OreoError> {
+    pub fn from(tx: TransactionWithNotes) -> Result<Self, OreoError> {
         // we handle send/receive transactions only now
         // todo: miner transaction
-        let status = match tx.r#type.as_str() {
+        let TransactionWithNotes {
+            hash,
+            fee,
+            r#type,
+            status,
+            block_sequence,
+            timestamp,
+            asset_balance_deltas,
+            notes,
+        } = tx;
+        let notes = notes.unwrap();
+        let tx_info = match r#type.as_str() {
             "send" => {
                 let receiver_candi: Vec<RpcNote> = notes
                     .into_iter()
@@ -114,31 +126,20 @@ impl TransactionDetail {
             }
             _ => None,
         };
-        match status {
-            Some((sender, receiver, memo, value)) => {
-                let TransactionStatus {
-                    hash,
-                    fee,
-                    r#type,
-                    status,
-                    block_sequence,
-                    timestamp,
-                    asset_balance_deltas,
-                } = tx;
-                Ok(Self {
-                    hash,
-                    fee,
-                    r#type,
-                    status,
-                    block_sequence,
-                    timestamp,
-                    asset_balance_deltas,
-                    sender,
-                    receiver,
-                    memo: Some(memo),
-                    value,
-                })
-            }
+        match tx_info {
+            Some((sender, receiver, memo, value)) => Ok(Self {
+                hash,
+                fee,
+                r#type,
+                status,
+                block_sequence,
+                timestamp,
+                asset_balance_deltas,
+                sender,
+                receiver,
+                memo: Some(memo),
+                value,
+            }),
             None => Err(OreoError::InternalRpcError),
         }
     }
@@ -153,12 +154,11 @@ pub struct GetTransactionDetail {
 
 impl GetTransactionDetail {
     pub fn from_rpc_data(data: GetAccountTransactionRep) -> Result<Self, OreoError> {
-        if data.transaction.is_none() || data.notes.is_none() {
+        if data.transaction.is_none() {
             return Err(OreoError::TransactionNotFound);
         }
-        let notes = data.notes.unwrap();
         let tx = data.transaction.unwrap();
-        let transaction_detail = TransactionDetail::from(notes, tx);
+        let transaction_detail = TransactionDetail::from(tx);
         match transaction_detail {
             Ok(detail) => Ok(Self {
                 account: data.account,
