@@ -14,7 +14,7 @@ use crate::{
     SharedState,
 };
 
-use super::abi::{GetAccountStatusReq, ImportAccountReq};
+use super::abi::{GetAccountStatusReq, GetTransactionDetail, ImportAccountReq};
 
 pub async fn import_vk_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
@@ -227,12 +227,26 @@ pub async fn account_transaction_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
-    shared
+    let rpc_transaction = shared
         .rpc_handler
         .get_account_transaction(GetAccountTransactionReq {
             account: account_name.unwrap(),
             hash: account.hash,
+            notes: Some(true),
         })
-        .await
-        .into_response()
+        .await;
+    match rpc_transaction {
+        Ok(RpcResponse { data, status: _ }) => {
+            let transaction_detail = GetTransactionDetail::from_rpc_data(data);
+            match transaction_detail {
+                Ok(detail) => RpcResponse {
+                    status: 200,
+                    data: detail,
+                }
+                .into_response(),
+                Err(e) => e.into_response(),
+            }
+        }
+        Err(e) => e.into_response(),
+    }
 }

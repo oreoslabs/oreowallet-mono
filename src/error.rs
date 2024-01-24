@@ -31,6 +31,8 @@ pub enum OreoError {
     BalanceNotEnough,
     #[error("Bad mint request")]
     BadMintRequest,
+    #[error("Transaction not found for account")]
+    TransactionNotFound,
 }
 
 impl IntoResponse for OreoError {
@@ -53,6 +55,9 @@ impl IntoResponse for OreoError {
             }
             OreoError::BalanceNotEnough => (StatusCode::from_u16(609).unwrap(), self.to_string()),
             OreoError::BadMintRequest => (StatusCode::from_u16(610).unwrap(), self.to_string()),
+            OreoError::TransactionNotFound => {
+                (StatusCode::from_u16(611).unwrap(), self.to_string())
+            }
         };
         Json(json!({"code": status_code.as_u16(), "error": err_msg})).into_response()
     }

@@ -97,7 +97,7 @@ impl RpcHandler {
         &self,
         req: GetAccountTransactionReq,
     ) -> Result<RpcResponse<GetAccountTransactionRep>, OreoError> {
-        let path = format!("http://{}/account/getAccountTransaction", self.endpoint);
+        let path = format!("http://{}/wallet/getAccountTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&req);
         handle_response(resp)
     }

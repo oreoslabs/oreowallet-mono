@@ -49,6 +49,11 @@ pub struct GetBalancesReq {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct AssetStatus {
+    status: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetBalance {
     pub asset_id: String,
@@ -57,7 +62,7 @@ pub struct AssetBalance {
     pub pending: String,
     pub available: String,
     pub sequence: Option<u64>,
-    pub asset_verification: String,
+    pub asset_verification: AssetStatus,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -72,7 +77,10 @@ impl GetBalancesRep {
             balances: base
                 .balances
                 .into_iter()
-                .filter(|x| x.asset_verification == "verified" || x.asset_id == IRON_NATIVE_ASSET)
+                .filter(|x| {
+                    x.asset_verification.status == "verified".to_string()
+                        || x.asset_id == IRON_NATIVE_ASSET
+                })
                 .collect::<Vec<AssetBalance>>(),
             ..base
         }
@@ -186,6 +194,7 @@ pub struct GetTransactionsRep {
 pub struct GetAccountTransactionReq {
     pub account: String,
     pub hash: String,
+    pub notes: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -195,10 +204,20 @@ pub struct AssetBalanceDelta {
     pub delta: String,
     pub asset_name: String,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcNote {
+    pub value: String,
+    pub memo: String,
+    pub sender: String,
+    pub owner: String,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetAccountTransactionRep {
     pub account: String,
     pub transaction: Option<TransactionStatus>,
+    pub notes: Option<Vec<RpcNote>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
