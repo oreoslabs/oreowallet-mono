@@ -97,37 +97,32 @@ impl TransactionDetail {
             asset_balance_deltas,
             notes,
         } = tx;
-        let notes = notes.unwrap();
-        let tx_info = match r#type.as_str() {
+        let mut notes = notes.unwrap();
+        let note = match r#type.as_str() {
             "send" => {
-                let receiver_candi: Vec<RpcNote> = notes
+                let mut receiver_candi: Vec<RpcNote> = notes
                     .into_iter()
                     .filter(|note| note.owner != note.sender)
                     .collect();
                 // currently, there should be only one receiver in most cases
-                let receiver_note = &receiver_candi[0];
-                let receiver = receiver_note.owner.to_owned();
-                let sender = receiver_note.sender.to_owned();
-                let memo = receiver_note.memo.to_owned();
-                let value = receiver_note.value.to_owned();
-                Some((sender, receiver, memo, value))
+                receiver_candi.pop()
             }
             "receive" => {
-                let sender_candi: Vec<RpcNote> = notes
+                let mut sender_candi: Vec<RpcNote> = notes
                     .into_iter()
                     .filter(|note| note.owner != note.sender)
                     .collect();
-                let sender_note = &sender_candi[0];
-                let sender = sender_note.sender.to_owned();
-                let memo = sender_note.memo.to_owned();
-                let receiver = sender_note.owner.to_owned();
-                let value = sender_note.value.to_owned();
-                Some((sender, receiver, memo, value))
+                sender_candi.pop()
             }
-            _ => None,
+            _ => notes.pop(),
         };
-        match tx_info {
-            Some((sender, receiver, memo, value)) => Ok(Self {
+        match note {
+            Some(RpcNote {
+                value,
+                memo,
+                sender,
+                owner,
+            }) => Ok(Self {
                 hash,
                 fee,
                 r#type,
@@ -135,10 +130,10 @@ impl TransactionDetail {
                 block_sequence,
                 timestamp,
                 asset_balance_deltas,
-                sender,
-                receiver,
-                memo: Some(memo),
-                value,
+                sender: sender.into(),
+                receiver: owner.into(),
+                memo: Some(memo.into()),
+                value: value.into(),
             }),
             None => Err(OreoError::InternalRpcError),
         }
