@@ -16,7 +16,6 @@ pub struct Ores {
 
 pub fn is_ores_local(asset: &AssetBalance) -> bool {
     asset.asset_id != IRON_NATIVE_ASSET.to_string()
-        && asset.asset_name == "orescriptions".to_string()
         && asset.confirmed == OREOS_VALUE.to_string()
         && asset.unconfirmed == OREOS_VALUE.to_string()
 }
