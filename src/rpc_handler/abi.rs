@@ -57,6 +57,7 @@ pub struct AssetStatus {
 #[serde(rename_all = "camelCase")]
 pub struct AssetBalance {
     pub asset_id: String,
+    pub asset_name: String,
     pub confirmed: String,
     pub unconfirmed: String,
     pub pending: String,
