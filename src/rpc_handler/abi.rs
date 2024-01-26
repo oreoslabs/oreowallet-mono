@@ -81,6 +81,9 @@ impl GetBalancesRep {
                 .filter(|x| {
                     x.asset_verification.status == "verified".to_string()
                         || x.asset_id == IRON_NATIVE_ASSET
+                        || x.asset_name
+                            == "6f7265736372697074696f6e7300000000000000000000000000000000000000"
+                                .to_string()
                 })
                 .collect::<Vec<AssetBalance>>(),
             ..base

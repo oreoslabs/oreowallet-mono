@@ -8,6 +8,7 @@ use crate::{
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Ores {
+    pub asset_id: String,
     pub tick: String,
     pub tick_index: u32,
     pub data: String,
