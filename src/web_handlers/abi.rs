@@ -98,23 +98,18 @@ impl TransactionDetail {
             notes,
         } = tx;
         let mut notes = notes.unwrap();
-        let note = match r#type.as_str() {
-            "send" => {
-                let mut receiver_candi: Vec<RpcNote> = notes
-                    .into_iter()
-                    .filter(|note| note.owner != note.sender)
-                    .collect();
-                // currently, there should be only one receiver in most cases
-                receiver_candi.pop()
-            }
-            "receive" => {
-                let mut sender_candi: Vec<RpcNote> = notes
-                    .into_iter()
-                    .filter(|note| note.owner != note.sender)
-                    .collect();
-                sender_candi.pop()
-            }
-            _ => notes.pop(),
+        let note = match notes
+            .iter()
+            .filter(|asset| asset.owner != asset.sender)
+            .collect::<Vec<&RpcNote>>()
+            .len()
+        {
+            0 => notes.pop(),
+            _ => notes
+                .into_iter()
+                .filter(|asset| asset.owner != asset.sender)
+                .collect::<Vec<RpcNote>>()
+                .pop(),
         };
         match note {
             Some(RpcNote {
