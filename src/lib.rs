@@ -59,7 +59,6 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
         .route("/getTransactions", post(get_transactions_handler))
         .route("/createTx", post(create_transaction_handler))
         .route("/broadcastTx", post(broadcast_transaction_handler))
-        .route("/generateProofs", post(generate_proof_handler))
         .route("/accountStatus", post(account_status_handler))
         .route("/latestBlock", get(latest_block_handler))
         .route("/ores", post(get_ores_handler))
@@ -80,6 +79,28 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
 
     let listener = TcpListener::bind(&listen).await?;
     info!("Server listening on {}", listen);
+    axum::serve(listener, router).await?;
+    Ok(())
+}
+
+pub async fn run_prover(listen: SocketAddr) -> Result<()> {
+    let router = Router::new()
+        .route("/generateProofs", post(generate_proof_handler))
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|_: BoxError| async {
+                    StatusCode::REQUEST_TIMEOUT
+                }))
+                .layer(TimeoutLayer::new(Duration::from_secs(30))),
+        )
+        .layer(
+            CorsLayer::new()
+                .allow_methods(Any)
+                .allow_origin(Any)
+                .allow_headers(Any),
+        );
+    let listener = TcpListener::bind(&listen).await?;
+    info!("Prover listening on {}", listen);
     axum::serve(listener, router).await?;
     Ok(())
 }
