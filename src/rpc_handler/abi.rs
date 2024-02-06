@@ -244,3 +244,24 @@ pub struct RpcAsset {
     pub metadata: String,
     pub verification: String,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetNoteWitnessReq {
+    pub index: u32,
+    pub confirmations: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthPath {
+    pub side: String,
+    pub hash_of_sibling: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetNoteWitnessRep {
+    pub tree_size: u32,
+    pub root_hash: String,
+    pub auth_path: Vec<AuthPath>,
+}

@@ -9,7 +9,8 @@ use crate::{
     error::OreoError,
     rpc_handler::abi::{
         BroadcastTxReq, CreateTxReq, GetAccountTransactionReq, GetBalancesRep, GetBalancesReq,
-        GetTransactionsReq, ImportAccountReq as RpcImportReq, OutPut, RpcResponse,
+        GetNoteWitnessReq, GetTransactionsReq, ImportAccountReq as RpcImportReq, OutPut,
+        RpcResponse,
     },
     SharedState,
 };
@@ -213,6 +214,17 @@ pub async fn latest_block_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
 ) -> impl IntoResponse {
     shared.rpc_handler.get_latest_block().await.into_response()
+}
+
+pub async fn note_witness_handler<T: DBHandler>(
+    State(shared): State<SharedState<T>>,
+    extract::Json(req): extract::Json<GetNoteWitnessReq>,
+) -> impl IntoResponse {
+    shared
+        .rpc_handler
+        .get_note_witness(req)
+        .await
+        .into_response()
 }
 
 pub async fn account_transaction_handler<T: DBHandler>(

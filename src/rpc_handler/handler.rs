@@ -109,6 +109,15 @@ impl RpcHandler {
         }));
         handle_response(resp)
     }
+
+    pub async fn get_note_witness(
+        &self,
+        req: GetNoteWitnessReq,
+    ) -> Result<RpcResponse<GetNoteWitnessRep>, OreoError> {
+        let path = format!("http://{}/chain/getNoteWitness", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(req);
+        handle_response(resp)
+    }
 }
 
 pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
