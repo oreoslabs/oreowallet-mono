@@ -43,6 +43,13 @@ pub struct ImportAccountRep {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct RemoveAccountReq {
+    pub account: String,
+    pub confirm: Option<bool>,
+    pub wait: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct GetBalancesReq {
     pub account: String,
     pub confirmations: Option<u32>,

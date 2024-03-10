@@ -21,7 +21,7 @@ use tracing_subscriber::EnvFilter;
 use crate::web_handlers::{
     account_status_handler, account_transaction_handler, broadcast_transaction_handler,
     create_transaction_handler, generate_proof_handler, get_balances_handler, get_ores_handler,
-    get_transactions_handler, import_vk_handler, latest_block_handler,
+    get_transactions_handler, import_vk_handler, latest_block_handler, remove_account_handler,
 };
 
 pub mod constants;
@@ -54,6 +54,7 @@ pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -
     let shared_state = SharedState::new(db_handler, &rpc_server);
     let router = Router::new()
         .route("/import", post(import_vk_handler))
+        .route("/remove", post(remove_account_handler))
         .route("/getBalances", post(get_balances_handler))
         .route("/getTransaction", post(account_transaction_handler))
         .route("/getTransactions", post(get_transactions_handler))

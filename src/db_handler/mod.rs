@@ -11,4 +11,6 @@ pub trait DBHandler {
     fn save_account(&self, address: String, worker_id: u32) -> Result<String, OreoError>;
     /// Get account name from db
     fn get_account(&self, address: String) -> Result<String, OreoError>;
+    /// Remove account from db
+    fn remove_account(&self, address: String) -> Result<String, OreoError>;
 }

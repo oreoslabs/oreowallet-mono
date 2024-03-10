@@ -138,6 +138,20 @@ impl DBHandler for RedisClient {
             },
         }
     }
+
+    fn remove_account(&self, address: String) -> Result<String, OreoError> {
+        match self.hget(REDIS_ACCOUNT_KEY, &address) {
+            Ok(name) => {
+                // should never panic
+                self.hdel(REDIS_ACCOUNT_KEY, &address).unwrap();
+                Ok(name)
+            }
+            Err(e) => match e {
+                R2D2Error::RedisPoolError(_) => Err(OreoError::DBError),
+                _ => Err(OreoError::NoImported(address)),
+            },
+        }
+    }
 }
 
 pub fn address_to_name(address: &str) -> String {
