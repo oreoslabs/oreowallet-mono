@@ -10,12 +10,12 @@ use crate::{
     rpc_handler::abi::{
         BroadcastTxReq, CreateTxReq, GetAccountTransactionReq, GetBalancesRep, GetBalancesReq,
         GetNoteWitnessReq, GetTransactionsReq, ImportAccountReq as RpcImportReq, OutPut,
-        RpcResponse,
+        RemoveAccountReq as RpcRemoveAccountReq, RpcResponse,
     },
     SharedState,
 };
 
-use super::abi::{GetAccountStatusReq, GetTransactionDetail, ImportAccountReq};
+use super::abi::{GetAccountStatusReq, GetTransactionDetail, ImportAccountReq, RemoveAccountReq};
 
 pub async fn import_vk_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
@@ -50,6 +50,42 @@ pub async fn import_vk_handler<T: DBHandler>(
         .import_view_only(rpc_data)
         .await
         .into_response()
+}
+
+pub async fn remove_account_handler<T: DBHandler>(
+    State(shared): State<SharedState<T>>,
+    extract::Json(remove_account): extract::Json<RemoveAccountReq>,
+) -> impl IntoResponse {
+    let account_name = shared
+        .db_handler
+        .lock()
+        .await
+        .get_account(remove_account.account.clone());
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
+    let result = shared
+        .rpc_handler
+        .remove_account(RpcRemoveAccountReq {
+            account: account_name.unwrap(),
+            confirm: Some(true),
+            wait: Some(true),
+        })
+        .await;
+    match result {
+        Ok(response) => {
+            if let Err(e) = shared
+                .db_handler
+                .lock()
+                .await
+                .remove_account(remove_account.account.clone())
+            {
+                return e.into_response();
+            }
+            response.into_response()
+        }
+        Err(e) => e.into_response(),
+    }
 }
 
 pub async fn get_balances_handler<T: DBHandler>(

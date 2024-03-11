@@ -7,7 +7,9 @@ use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::{
     error::OreoError,
-    web_handlers::abi::{GetAccountStatusRep, GetAccountStatusReq, GetLatestBlockRep},
+    web_handlers::abi::{
+        GetAccountStatusRep, GetAccountStatusReq, GetLatestBlockRep, RemoveAccountRep,
+    },
 };
 
 use super::{abi::*, RpcError};
@@ -39,6 +41,25 @@ impl RpcHandler {
             .clone()
             .post(&path)
             .send_json(ureq::json!({"account": req}));
+        handle_response(resp)
+    }
+
+    pub async fn remove_account(
+        &self,
+        req: RemoveAccountReq,
+    ) -> Result<RpcResponse<RemoveAccountRep>, OreoError> {
+        debug!("req: {:?}", req);
+        let path = format!("http://{}/wallet/removeAccount", self.endpoint);
+        let resp = self
+            .agent
+            .clone()
+            .post(&path)
+            .send_json(&req)
+            .map(|res| match res.status() {
+                200 => Response::new(200, "OK", "{\"status\":200,\"data\":{\"removed\":true}}")
+                    .unwrap(),
+                _ => res,
+            });
         handle_response(resp)
     }
 

@@ -23,6 +23,16 @@ pub struct ImportAccountRep {
     pub name: String,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RemoveAccountReq {
+    pub account: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RemoveAccountRep {
+    pub removed: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateProofReq {
