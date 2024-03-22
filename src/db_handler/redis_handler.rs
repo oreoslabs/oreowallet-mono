@@ -9,7 +9,7 @@ use r2d2_redis::{
     RedisConnectionManager,
 };
 
-use super::DBHandler;
+use super::{Account, DBHandler};
 use crate::error::OreoError;
 
 pub type R2D2Pool = r2d2::Pool<RedisConnectionManager>;
@@ -129,9 +129,9 @@ impl DBHandler for RedisClient {
         Ok(account_name)
     }
 
-    fn get_account(&self, address: String) -> Result<String, OreoError> {
+    fn get_account(&self, address: String) -> Result<Account, OreoError> {
         match self.hget(REDIS_ACCOUNT_KEY, &address) {
-            Ok(name) => Ok(name),
+            Ok(name) => Ok(Account::redis_mock(name)),
             Err(e) => match e {
                 R2D2Error::RedisPoolError(_) => Err(OreoError::DBError),
                 _ => Err(OreoError::NoImported(address)),
@@ -150,6 +150,17 @@ impl DBHandler for RedisClient {
                 R2D2Error::RedisPoolError(_) => Err(OreoError::DBError),
                 _ => Err(OreoError::NoImported(address)),
             },
+        }
+    }
+
+    fn get_accounts(&self, _filter_head: u32) -> Result<Vec<Account>, OreoError> {
+        match self.hgetall(REDIS_ACCOUNT_KEY) {
+            Ok(accounts) => Ok(accounts
+                .values()
+                .into_iter()
+                .map(|account| Account::redis_mock(account.to_string()))
+                .collect()),
+            Err(_) => Err(OreoError::DBError),
         }
     }
 }
