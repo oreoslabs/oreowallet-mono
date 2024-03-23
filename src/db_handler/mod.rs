@@ -5,7 +5,7 @@ pub use redis_handler::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    constants::{MAINNET_GENESIS, MAINNET_SEQUENCE},
+    constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE},
     error::OreoError,
 };
 
@@ -41,8 +41,8 @@ impl Account {
             name,
             create_head: None,
             create_hash: None,
-            head: MAINNET_SEQUENCE,
-            hash: MAINNET_GENESIS.into(),
+            head: MAINNET_GENESIS_SEQUENCE,
+            hash: MAINNET_GENESIS_HASH.into(),
             in_vk: "".into(),
             out_vk: "".into(),
             vk: "".into(),
