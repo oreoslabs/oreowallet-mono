@@ -67,7 +67,7 @@ pub async fn remove_account_handler<T: DBHandler>(
     let result = shared
         .rpc_handler
         .remove_account(RpcRemoveAccountReq {
-            account: account_name.unwrap(),
+            account: account_name.unwrap().name,
             confirm: Some(true),
             wait: Some(true),
         })
@@ -103,7 +103,7 @@ pub async fn get_balances_handler<T: DBHandler>(
     let resp = shared
         .rpc_handler
         .get_balance(GetBalancesReq {
-            account: account_name.unwrap(),
+            account: account_name.unwrap().name,
             confirmations: Some(get_balance.confirmations.unwrap_or(10)),
         })
         .await;
@@ -134,7 +134,7 @@ pub async fn get_ores_handler<T: DBHandler>(
     let resp = shared
         .rpc_handler
         .get_balance(GetBalancesReq {
-            account: account_name.unwrap(),
+            account: account_name.unwrap().name,
             confirmations: Some(get_balance.confirmations.unwrap_or(10)),
         })
         .await;
@@ -165,7 +165,7 @@ pub async fn get_transactions_handler<T: DBHandler>(
     shared
         .rpc_handler
         .get_transactions(GetTransactionsReq {
-            account: account_name.unwrap(),
+            account: account_name.unwrap().name,
             limit: Some(get_transactions.limit.unwrap_or(6)),
             reverse: Some(true),
         })
@@ -203,7 +203,7 @@ pub async fn create_transaction_handler<T: DBHandler>(
     shared
         .rpc_handler
         .create_transaction(CreateTxReq {
-            account: account_name.unwrap(),
+            account: account_name.unwrap().name,
             outputs: Some(outputs),
             fee: Some(create_transaction.fee.unwrap_or("1".into())),
             expiration_delta: Some(create_transaction.expiration_delta.unwrap_or(30)),
@@ -240,7 +240,7 @@ pub async fn account_status_handler<T: DBHandler>(
     shared
         .rpc_handler
         .get_account_status(GetAccountStatusReq {
-            account: account_name.unwrap(),
+            account: account_name.unwrap().name,
         })
         .await
         .into_response()
@@ -278,7 +278,7 @@ pub async fn account_transaction_handler<T: DBHandler>(
     let rpc_transaction = shared
         .rpc_handler
         .get_account_transaction(GetAccountTransactionReq {
-            account: account_name.unwrap(),
+            account: account_name.unwrap().name,
             hash: account.hash,
             notes: Some(true),
         })
