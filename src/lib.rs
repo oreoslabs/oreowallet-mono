@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post},
     BoxError, Router,
 };
+use config::DbConfig;
 use db_handler::{DBHandler, RedisClient};
 use rpc_handler::RpcHandler;
 use tokio::{
@@ -24,6 +25,7 @@ use crate::web_handlers::{
     get_transactions_handler, import_vk_handler, latest_block_handler, remove_account_handler,
 };
 
+pub mod config;
 pub mod constants;
 pub mod db_handler;
 pub mod error;
@@ -49,9 +51,9 @@ where
     }
 }
 
-pub async fn run_server(listen: SocketAddr, rpc_server: String, redis: String) -> Result<()> {
-    let db_handler = RedisClient::init(&redis);
-    let shared_state = SharedState::new(db_handler, &rpc_server);
+pub async fn run_server(listen: SocketAddr, rpc_server: String, config: &DbConfig) -> Result<()> {
+    let redis_handler = RedisClient::from_config(config);
+    let shared_state = SharedState::new(redis_handler, &rpc_server);
     let router = Router::new()
         .route("/import", post(import_vk_handler))
         .route("/remove", post(remove_account_handler))

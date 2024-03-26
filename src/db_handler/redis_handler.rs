@@ -10,12 +10,11 @@ use r2d2_redis::{
 };
 
 use super::{Account, DBHandler};
-use crate::error::OreoError;
+use crate::{config::DbConfig, error::OreoError};
 
 pub type R2D2Pool = r2d2::Pool<RedisConnectionManager>;
 pub type R2D2Con = r2d2::PooledConnection<RedisConnectionManager>;
 
-const CACHE_POOL_MAX_OPEN: u32 = 200;
 const CACHE_POOL_MIN_IDLE: u32 = 8;
 const CACHE_POOL_TIMEOUT_SECONDS: u64 = 3;
 const CACHE_POOL_EXPIRE_SECONDS: u64 = 1;
@@ -40,10 +39,10 @@ pub struct RedisClient {
 }
 
 impl RedisClient {
-    pub fn connect(url: &str) -> Result<Self, R2D2Error> {
+    pub fn connect(url: &str, max_connections: u32) -> Result<Self, R2D2Error> {
         let manager = RedisConnectionManager::new(url).map_err(R2D2Error::RedisClientError)?;
         let pool = r2d2::Pool::builder()
-            .max_size(CACHE_POOL_MAX_OPEN)
+            .max_size(max_connections)
             .max_lifetime(Some(Duration::from_secs(CACHE_POOL_EXPIRE_SECONDS)))
             .min_idle(Some(CACHE_POOL_MIN_IDLE))
             .build(manager)
@@ -103,11 +102,6 @@ impl RedisClient {
 }
 
 impl DBHandler for RedisClient {
-    fn init(db_addr: &str) -> Self {
-        info!("Redis handler selected");
-        Self::connect(db_addr).unwrap()
-    }
-
     fn save_account(&self, address: String, _worker_id: u32) -> Result<String, OreoError> {
         match self.hget(REDIS_ACCOUNT_KEY, &address) {
             Ok(_) => {
@@ -162,6 +156,11 @@ impl DBHandler for RedisClient {
                 .collect()),
             Err(_) => Err(OreoError::DBError),
         }
+    }
+
+    fn from_config(config: &DbConfig) -> Self {
+        info!("Redis handler selected");
+        RedisClient::connect(&config.server_url(), config.max_connections).unwrap()
     }
 }
 
