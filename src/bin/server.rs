@@ -2,16 +2,16 @@ use std::net::SocketAddr;
 
 use anyhow::Result;
 use clap::Parser;
-use ironfish_server::{handle_signals, initialize_logger, run_server};
+use ironfish_server::{config::DbConfig, handle_signals, initialize_logger, run_server};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Command {
     /// The ip:port server will listen on
     #[clap(short, long, default_value = "0.0.0.0:10001")]
     pub listen: SocketAddr,
-    /// The redis server to connect to
-    #[clap(short, long, default_value = "redis://localhost")]
-    pub redis: String,
+    /// The path to db config file
+    #[clap(short, long)]
+    pub config: String,
     /// Set your logger level
     #[clap(short, long, default_value = "0")]
     pub verbosity: u8,
@@ -25,12 +25,13 @@ async fn main() -> Result<()> {
     let args = Command::parse();
     let Command {
         listen,
-        redis,
+        config,
         verbosity,
         node,
     } = args;
     initialize_logger(verbosity);
     handle_signals().await?;
-    run_server(listen.into(), node, redis).await?;
+    let db_config = DbConfig::load(config).unwrap();
+    run_server(listen.into(), node, &db_config).await?;
     Ok(())
 }

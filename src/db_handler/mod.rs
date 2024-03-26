@@ -5,13 +5,14 @@ pub use redis_handler::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    config::DbConfig,
     constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE},
     error::OreoError,
 };
 
 pub trait DBHandler {
-    /// Initialize a DB handler, redis only now
-    fn init(db_addr: &str) -> Self;
+    /// Initialize a DB handler
+    fn from_config(config: &DbConfig) -> Self;
     /// Save account in db and return account name
     fn save_account(&self, address: String, worker_id: u32) -> Result<String, OreoError>;
     /// Get account name from db
