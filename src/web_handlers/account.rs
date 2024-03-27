@@ -32,7 +32,8 @@ pub async fn import_vk_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .save_account(public_address.clone(), 0);
+        .save_account(public_address.clone(), 0)
+        .await;
     if let Err(e) = account_name {
         return e.into_response();
     }
@@ -60,7 +61,8 @@ pub async fn remove_account_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(remove_account.account.clone());
+        .get_account(remove_account.account.clone())
+        .await;
     if let Err(e) = account_name {
         return e.into_response();
     }
@@ -79,6 +81,7 @@ pub async fn remove_account_handler<T: DBHandler>(
                 .lock()
                 .await
                 .remove_account(remove_account.account.clone())
+                .await
             {
                 return e.into_response();
             }
@@ -96,7 +99,8 @@ pub async fn get_balances_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(get_balance.account.clone());
+        .get_account(get_balance.account.clone())
+        .await;
     if let Err(e) = account_name {
         return e.into_response();
     }
@@ -127,7 +131,8 @@ pub async fn get_ores_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(get_balance.account.clone());
+        .get_account(get_balance.account.clone())
+        .await;
     if let Err(e) = account_name {
         return e.into_response();
     }
@@ -158,7 +163,8 @@ pub async fn get_transactions_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(get_transactions.account.clone());
+        .get_account(get_transactions.account.clone())
+        .await;
     if let Err(e) = account_name {
         return e.into_response();
     }
@@ -181,7 +187,8 @@ pub async fn create_transaction_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(create_transaction.account.clone());
+        .get_account(create_transaction.account.clone())
+        .await;
     if let Err(e) = account_name {
         return e.into_response();
     }
@@ -233,7 +240,8 @@ pub async fn account_status_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(account.account.clone());
+        .get_account(account.account.clone())
+        .await;
     if let Err(e) = account_name {
         return e.into_response();
     }
@@ -271,7 +279,8 @@ pub async fn account_transaction_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .get_account(account.account.clone());
+        .get_account(account.account.clone())
+        .await;
     if let Err(e) = account_name {
         return e.into_response();
     }
