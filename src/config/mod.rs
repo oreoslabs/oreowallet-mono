@@ -55,8 +55,8 @@ mod tests {
     use super::DbConfig;
 
     #[test]
-    fn config_should_be_loaded() {
-        let config = DbConfig::load("./fixtures/config.yml");
+    fn redis_config_should_be_loaded() {
+        let config = DbConfig::load("./fixtures/redis-config.yml");
         assert_eq!(
             config.unwrap(),
             DbConfig {

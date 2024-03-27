@@ -157,7 +157,7 @@ mod tests {
 
     #[tokio::test]
     async fn save_account_should_work() {
-        let config = DbConfig::load("./fixtures/config.yml").unwrap();
+        let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
         let db_handler = RedisClient::from_config(&config);
         let account_name = address_to_name(ADDRESS);
         let saved_name = db_handler.save_account(ADDRESS.to_string(), 0).await;
@@ -166,7 +166,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_account_should_work() {
-        let config = DbConfig::load("./fixtures/config.yml").unwrap();
+        let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
         let db_handler = RedisClient::from_config(&config);
         let account_name = address_to_name(ADDRESS);
         let saved_name = db_handler.get_account(ADDRESS.to_string()).await.unwrap();
@@ -175,7 +175,7 @@ mod tests {
 
     #[tokio::test]
     async fn remove_account_should_work() {
-        let config = DbConfig::load("./fixtures/config.yml").unwrap();
+        let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
         let db_handler = RedisClient::from_config(&config);
         let account_name = address_to_name(ADDRESS);
         let removed_name = db_handler
