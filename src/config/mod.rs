@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use std::{fs, path::Path};
 
@@ -12,7 +13,7 @@ pub struct DbConfig {
     pub password: String,
     pub dbname: String,
     #[serde(default = "default_pool_size")]
-    pub max_connections: u32,
+    pub default_pool_size: u32,
     pub protocol: String,
 }
 
@@ -44,6 +45,29 @@ impl DbConfig {
     pub fn load(filename: impl AsRef<Path>) -> Result<Self> {
         let config = fs::read_to_string(filename.as_ref())
             .map_err(|_| anyhow!("Failed to read db config"))?;
+        info!("DB config: {:?}", config);
         serde_yaml::from_str(&config).map_err(|_| anyhow!("Failed to parse db config"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DbConfig;
+
+    #[test]
+    fn config_should_be_loaded() {
+        let config = DbConfig::load("./fixtures/config.yml");
+        assert_eq!(
+            config.unwrap(),
+            DbConfig {
+                host: "localhost".to_string(),
+                port: 6379,
+                user: "".to_string(),
+                password: "".to_string(),
+                dbname: "oreowallet".to_string(),
+                default_pool_size: 200,
+                protocol: "redis".to_string()
+            }
+        );
     }
 }

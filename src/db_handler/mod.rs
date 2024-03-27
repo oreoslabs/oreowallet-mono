@@ -10,20 +10,21 @@ use crate::{
     error::OreoError,
 };
 
+#[async_trait::async_trait]
 pub trait DBHandler {
     /// Initialize a DB handler
     fn from_config(config: &DbConfig) -> Self;
     /// Save account in db and return account name
-    fn save_account(&self, address: String, worker_id: u32) -> Result<String, OreoError>;
+    async fn save_account(&self, address: String, worker_id: u32) -> Result<String, OreoError>;
     /// Get account name from db
-    fn get_account(&self, address: String) -> Result<Account, OreoError>;
+    async fn get_account(&self, address: String) -> Result<Account, OreoError>;
     /// Remove account from db
-    fn remove_account(&self, address: String) -> Result<String, OreoError>;
+    async fn remove_account(&self, address: String) -> Result<String, OreoError>;
     /// Get all accounts
-    fn get_accounts(&self, filter_head: u32) -> Result<Vec<Account>, OreoError>;
+    async fn get_accounts(&self, filter_head: u32) -> Result<Vec<Account>, OreoError>;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Account {
     pub name: String,
     pub create_head: Option<u32>,

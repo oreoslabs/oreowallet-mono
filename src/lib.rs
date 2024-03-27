@@ -378,17 +378,4 @@ mod tests {
         let status = response.status();
         assert_eq!(status.as_u16(), 900);
     }
-
-    // account used for tests
-    //     Mnemonic  eight fog reward cat spoon lawsuit mention mean number wine female asthma adapt flush salad slam rib desert goddess flame code pass turn route
-    //  Spending Key  46eb4ae291ed28fc62c44e977f7153870030b3af9658b8e77590ac22d1417ab5
-    //      View Key  4ae4eb9606ba57b3b17a444100a9ac6453cd67e6fe4c860e63a2e18b1200978ab5ecce68e8639d5016cbe73b0ea9a3c8e906fc881af2e9ccfa7a7b63fb73d555
-    //   Incoming View Key  4a08bec0ec5a471352f340d737e4b3baec2aec8d0a2e12201d92d8ad71aadd07
-    //   Outgoing View Key  cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7
-    //       Address  d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64
-
-    const VK: &str = "4ae4eb9606ba57b3b17a444100a9ac6453cd67e6fe4c860e63a2e18b1200978ab5ecce68e8639d5016cbe73b0ea9a3c8e906fc881af2e9ccfa7a7b63fb73d555";
-    const IN_VK: &str = "4a08bec0ec5a471352f340d737e4b3baec2aec8d0a2e12201d92d8ad71aadd07";
-    const OUT_VK: &str = "cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7";
-    const ADDRESS: &str = "d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64";
 }
