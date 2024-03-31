@@ -64,7 +64,8 @@ impl RedisClient {
 
 #[async_trait::async_trait]
 impl DBHandler for RedisClient {
-    async fn save_account(&self, address: String, _worker_id: u32) -> Result<String, OreoError> {
+    async fn save_account(&self, account: Account, _worker_id: u32) -> Result<String, OreoError> {
+        let address = account.address;
         match self.hget(REDIS_ACCOUNT_KEY, &address).await {
             Ok(_) => {
                 return Err(OreoError::Duplicate(address));
@@ -111,17 +112,6 @@ impl DBHandler for RedisClient {
         }
     }
 
-    async fn get_accounts(&self, _filter_head: u32) -> Result<Vec<Account>, OreoError> {
-        match self.hgetall(REDIS_ACCOUNT_KEY).await {
-            Ok(accounts) => Ok(accounts
-                .values()
-                .into_iter()
-                .map(|account| Account::redis_mock(account.to_string()))
-                .collect()),
-            Err(_) => Err(OreoError::DBError),
-        }
-    }
-
     fn from_config(config: &DbConfig) -> Self {
         info!("Redis handler selected");
         RedisClient::connect(&config.server_url(), config.default_pool_size).unwrap()
@@ -156,16 +146,18 @@ mod tests {
     const ADDRESS: &str = "d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64";
 
     #[tokio::test]
-    async fn save_account_should_work() {
+    async fn save_account_should_work_redis() {
         let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
         let db_handler = RedisClient::from_config(&config);
         let account_name = address_to_name(ADDRESS);
-        let saved_name = db_handler.save_account(ADDRESS.to_string(), 0).await;
+        let mut account = Account::redis_mock(account_name.clone());
+        account.address = ADDRESS.to_string();
+        let saved_name = db_handler.save_account(account, 0).await;
         assert_eq!(account_name, saved_name.unwrap());
     }
 
     #[tokio::test]
-    async fn get_account_should_work() {
+    async fn get_account_should_work_redis() {
         let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
         let db_handler = RedisClient::from_config(&config);
         let account_name = address_to_name(ADDRESS);
@@ -174,7 +166,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn remove_account_should_work() {
+    async fn remove_account_should_work_redis() {
         let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
         let db_handler = RedisClient::from_config(&config);
         let account_name = address_to_name(ADDRESS);
