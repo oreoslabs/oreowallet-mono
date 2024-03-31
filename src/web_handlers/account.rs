@@ -5,7 +5,7 @@ use axum::{
 
 use crate::{
     constants::ACCOUNT_VERSION,
-    db_handler::DBHandler,
+    db_handler::{Account, DBHandler},
     error::OreoError,
     rpc_handler::abi::{
         BroadcastTxReq, CreateTxReq, GetAccountTransactionReq, GetBalancesRep, GetBalancesReq,
@@ -32,7 +32,7 @@ pub async fn import_vk_handler<T: DBHandler>(
         .db_handler
         .lock()
         .await
-        .save_account(public_address.clone(), 0)
+        .save_account(Account::redis_mock(public_address.clone()), 0)
         .await;
     if let Err(e) = account_name {
         return e.into_response();
