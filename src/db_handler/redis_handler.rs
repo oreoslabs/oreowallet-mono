@@ -65,7 +65,7 @@ impl RedisClient {
 #[async_trait::async_trait]
 impl DBHandler for RedisClient {
     async fn save_account(&self, account: Account, _worker_id: u32) -> Result<String, OreoError> {
-        let address = account.address;
+        let address = account.address.clone();
         match self.hget(REDIS_ACCOUNT_KEY, &address).await {
             Ok(_) => {
                 return Err(OreoError::Duplicate(address));
@@ -78,7 +78,12 @@ impl DBHandler for RedisClient {
             }
         }
         let account_name = address_to_name(&address);
-        if let Err(_) = self.hset(REDIS_ACCOUNT_KEY, &address, &account_name).await {
+        let str_account = serde_json::to_string(&account);
+        if str_account.is_err() {
+            return Err(OreoError::SeralizeError(address));
+        };
+        let str_account = str_account.unwrap();
+        if let Err(_) = self.hset(REDIS_ACCOUNT_KEY, &address, &str_account).await {
             return Err(OreoError::DBError);
         }
         info!(
@@ -90,7 +95,14 @@ impl DBHandler for RedisClient {
 
     async fn get_account(&self, address: String) -> Result<Account, OreoError> {
         match self.hget(REDIS_ACCOUNT_KEY, &address).await {
-            Ok(name) => Ok(Account::redis_mock(name)),
+            Ok(data) => {
+                let account = serde_json::from_str::<Account>(&data);
+                if account.is_err() {
+                    Err(OreoError::ParseError(address))
+                } else {
+                    Ok(account.unwrap())
+                }
+            }
             Err(e) => match e.kind() {
                 ErrorKind::TypeError => Err(OreoError::NoImported(address)),
                 _ => Err(OreoError::DBError),
@@ -100,10 +112,10 @@ impl DBHandler for RedisClient {
 
     async fn remove_account(&self, address: String) -> Result<String, OreoError> {
         match self.hget(REDIS_ACCOUNT_KEY, &address).await {
-            Ok(name) => {
+            Ok(_) => {
                 // should never panic
                 self.hdel(REDIS_ACCOUNT_KEY, &address).await.unwrap();
-                Ok(name)
+                Ok(address_to_name(&address))
             }
             Err(e) => match e.kind() {
                 ErrorKind::TypeError => Err(OreoError::NoImported(address)),
@@ -136,6 +148,8 @@ mod tests {
     use super::address_to_name;
     use super::RedisClient;
     use crate::config::DbConfig;
+    use crate::constants::MAINNET_GENESIS_HASH;
+    use crate::constants::MAINNET_GENESIS_SEQUENCE;
     use crate::db_handler::Account;
     use crate::db_handler::DBHandler;
     use crate::error::OreoError;
@@ -145,30 +159,45 @@ mod tests {
     const OUT_VK: &str = "cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7";
     const ADDRESS: &str = "d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64";
 
-    #[tokio::test]
-    async fn save_account_should_work_redis() {
+    fn get_test_account() -> Account {
+        Account {
+            name: address_to_name(ADDRESS),
+            create_head: None,
+            create_hash: None,
+            head: MAINNET_GENESIS_SEQUENCE,
+            hash: MAINNET_GENESIS_HASH.to_string(),
+            in_vk: IN_VK.to_string(),
+            out_vk: OUT_VK.to_string(),
+            vk: VK.to_string(),
+            address: ADDRESS.to_string(),
+        }
+    }
+
+    fn get_tdb() -> RedisClient {
         let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
         let db_handler = RedisClient::from_config(&config);
-        let account_name = address_to_name(ADDRESS);
-        let mut account = Account::redis_mock(account_name.clone());
-        account.address = ADDRESS.to_string();
-        let saved_name = db_handler.save_account(account, 0).await;
-        assert_eq!(account_name, saved_name.unwrap());
+        db_handler
+    }
+
+    #[tokio::test]
+    async fn save_account_should_work_redis() {
+        let t_account = get_test_account();
+        let db_handler = get_tdb();
+        let saved_name = db_handler.save_account(t_account.clone(), 0).await;
+        assert!(saved_name.is_ok());
     }
 
     #[tokio::test]
     async fn get_account_should_work_redis() {
-        let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
-        let db_handler = RedisClient::from_config(&config);
-        let account_name = address_to_name(ADDRESS);
-        let saved_name = db_handler.get_account(ADDRESS.to_string()).await.unwrap();
-        assert_eq!(Account::redis_mock(account_name), saved_name);
+        let t_account = get_test_account();
+        let db_handler = get_tdb();
+        let saved_account = db_handler.get_account(ADDRESS.to_string()).await.unwrap();
+        assert_eq!(t_account, saved_account);
     }
 
     #[tokio::test]
     async fn remove_account_should_work_redis() {
-        let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
-        let db_handler = RedisClient::from_config(&config);
+        let db_handler = get_tdb();
         let account_name = address_to_name(ADDRESS);
         let removed_name = db_handler
             .remove_account(ADDRESS.to_string())

@@ -19,7 +19,7 @@ impl<T: Serialize> IntoResponse for RpcResponse<T> {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CreateAccountOpt {
     pub hash: String,
     pub sequence: u64,

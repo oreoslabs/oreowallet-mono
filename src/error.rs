@@ -33,6 +33,10 @@ pub enum OreoError {
     BadMintRequest,
     #[error("Transaction not found for account")]
     TransactionNotFound,
+    #[error("Failed to seralize data `{0}`")]
+    SeralizeError(String),
+    #[error("Failed to parse data `{0}`")]
+    ParseError(String),
 }
 
 impl IntoResponse for OreoError {
@@ -58,6 +62,8 @@ impl IntoResponse for OreoError {
             OreoError::TransactionNotFound => {
                 (StatusCode::from_u16(611).unwrap(), self.to_string())
             }
+            OreoError::SeralizeError(_) => (StatusCode::from_u16(612).unwrap(), self.to_string()),
+            OreoError::ParseError(_) => (StatusCode::from_u16(613).unwrap(), self.to_string()),
         };
         Json(json!({"code": status_code.as_u16(), "error": err_msg})).into_response()
     }

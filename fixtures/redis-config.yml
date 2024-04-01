@@ -2,6 +2,6 @@ host: "localhost"
 port: 6379
 user: ""
 password: ""
-dbname: "oreowallet"
+dbname: ""
 default_pool_size: 200
 protocol: "redis"

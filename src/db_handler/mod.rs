@@ -7,11 +7,7 @@ pub use redis_handler::*;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-use crate::{
-    config::DbConfig,
-    constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE},
-    error::OreoError,
-};
+use crate::{config::DbConfig, error::OreoError};
 
 #[async_trait::async_trait]
 pub trait DBHandler {
@@ -37,21 +33,4 @@ pub struct Account {
     pub out_vk: String,
     pub vk: String,
     pub address: String,
-}
-
-impl Account {
-    /// used to make redis handler work
-    pub fn redis_mock(name: String) -> Self {
-        Self {
-            name,
-            create_head: None,
-            create_hash: None,
-            head: MAINNET_GENESIS_SEQUENCE,
-            hash: MAINNET_GENESIS_HASH.into(),
-            in_vk: "".into(),
-            out_vk: "".into(),
-            vk: "".into(),
-            address: "".into(),
-        }
-    }
 }
