@@ -38,6 +38,11 @@ pub struct ImportAccountReq {
     pub created_at: Option<CreateAccountOpt>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ExportAccountRep {
+    pub account: ImportAccountReq,
+}
+
 impl ImportAccountReq {
     pub fn to_account(&self) -> crate::db_handler::Account {
         let (create_head, create_hash) = match &self.created_at {

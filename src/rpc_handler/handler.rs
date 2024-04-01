@@ -143,7 +143,7 @@ impl RpcHandler {
     pub async fn export_account(
         &self,
         account: String,
-    ) -> Result<RpcResponse<ImportAccountReq>, OreoError> {
+    ) -> Result<RpcResponse<ExportAccountRep>, OreoError> {
         let path = format!("http://{}/wallet/exportAccount", self.endpoint);
         let resp = self
             .agent
