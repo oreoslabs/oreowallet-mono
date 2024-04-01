@@ -14,7 +14,7 @@ pub trait DBHandler {
     /// Initialize a DB handler
     fn from_config(config: &DbConfig) -> Self;
     /// Save account in db and return account name
-    async fn save_account(&self, address: Account, worker_id: u32) -> Result<String, OreoError>;
+    async fn save_account(&self, account: Account, worker_id: u32) -> Result<String, OreoError>;
     /// Get account name from db
     async fn get_account(&self, address: String) -> Result<Account, OreoError>;
     /// Remove account from db

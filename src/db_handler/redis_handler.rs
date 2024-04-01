@@ -9,16 +9,21 @@ use super::{Account, DBHandler};
 use crate::{config::DbConfig, error::OreoError};
 
 pub const REDIS_ACCOUNT_KEY: &str = "IRONACCOUNT";
+pub const REDIS_ACCOUNT_KEY_V1: &str = "IRONACCOUNTV1";
 
 #[derive(Debug, Clone)]
 pub struct RedisClient {
+    pub db_name: String,
     pub client: Client,
 }
 
 impl RedisClient {
     pub fn connect(url: &str, _max_connections: u32) -> RedisResult<Self> {
         let client = Client::open(url)?;
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            db_name: REDIS_ACCOUNT_KEY_V1.to_string(),
+        })
     }
 
     pub async fn get_con(&self) -> RedisResult<MultiplexedConnection> {
@@ -66,7 +71,7 @@ impl RedisClient {
 impl DBHandler for RedisClient {
     async fn save_account(&self, account: Account, _worker_id: u32) -> Result<String, OreoError> {
         let address = account.address.clone();
-        match self.hget(REDIS_ACCOUNT_KEY, &address).await {
+        match self.hget(&self.db_name, &address).await {
             Ok(_) => {
                 return Err(OreoError::Duplicate(address));
             }
@@ -83,7 +88,7 @@ impl DBHandler for RedisClient {
             return Err(OreoError::SeralizeError(address));
         };
         let str_account = str_account.unwrap();
-        if let Err(_) = self.hset(REDIS_ACCOUNT_KEY, &address, &str_account).await {
+        if let Err(_) = self.hset(&self.db_name, &address, &str_account).await {
             return Err(OreoError::DBError);
         }
         info!(
@@ -94,7 +99,7 @@ impl DBHandler for RedisClient {
     }
 
     async fn get_account(&self, address: String) -> Result<Account, OreoError> {
-        match self.hget(REDIS_ACCOUNT_KEY, &address).await {
+        match self.hget(&self.db_name, &address).await {
             Ok(data) => {
                 let account = serde_json::from_str::<Account>(&data);
                 if account.is_err() {
@@ -111,10 +116,10 @@ impl DBHandler for RedisClient {
     }
 
     async fn remove_account(&self, address: String) -> Result<String, OreoError> {
-        match self.hget(REDIS_ACCOUNT_KEY, &address).await {
+        match self.hget(&self.db_name, &address).await {
             Ok(_) => {
                 // should never panic
-                self.hdel(REDIS_ACCOUNT_KEY, &address).await.unwrap();
+                self.hdel(&self.db_name, &address).await.unwrap();
                 Ok(address_to_name(&address))
             }
             Err(e) => match e.kind() {

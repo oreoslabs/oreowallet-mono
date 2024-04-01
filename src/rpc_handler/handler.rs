@@ -139,6 +139,19 @@ impl RpcHandler {
         let resp = self.agent.clone().post(&path).send_json(req);
         handle_response(resp)
     }
+
+    pub async fn export_account(
+        &self,
+        account: String,
+    ) -> Result<RpcResponse<ImportAccountReq>, OreoError> {
+        let path = format!("http://{}/wallet/exportAccount", self.endpoint);
+        let resp = self
+            .agent
+            .clone()
+            .post(&path)
+            .send_json(json!({"account": account, "format": "JSON".to_string()}));
+        handle_response(resp)
+    }
 }
 
 pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
