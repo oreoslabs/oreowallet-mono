@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
         "redis" => {
             for (_, name) in accounts_v0.into_iter() {
                 if let Ok(imported) = rpc_handler.export_account(name).await {
-                    let account = imported.data.to_account();
+                    let account = imported.data.account.to_account();
                     let _ = redis_handler.save_account(account, 0).await.unwrap();
                 }
             }
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
             let pg_handler = PgHandler::from_config(&DbConfig::load(dconfig).unwrap());
             for (_, name) in accounts_v0.into_iter() {
                 if let Ok(imported) = rpc_handler.export_account(name).await {
-                    let account = imported.data.to_account();
+                    let account = imported.data.account.to_account();
                     let _ = pg_handler.save_account(account, 0).await.unwrap();
                 }
             }
