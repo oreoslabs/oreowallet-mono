@@ -45,19 +45,21 @@ async fn main() -> Result<()> {
     match dname.as_str() {
         "redis" => {
             for (_, name) in accounts_v0.into_iter() {
-                let imported = rpc_handler.export_account(name).await.unwrap().data;
-                let account = imported.to_account();
-                let _ = redis_handler.save_account(account, 0).await.unwrap();
+                if let Ok(imported) = rpc_handler.export_account(name).await {
+                    let account = imported.data.to_account();
+                    let _ = redis_handler.save_account(account, 0).await.unwrap();
+                }
             }
-        },
+        }
         "postgres" => {
             let pg_handler = PgHandler::from_config(&DbConfig::load(dconfig).unwrap());
             for (_, name) in accounts_v0.into_iter() {
-                let imported = rpc_handler.export_account(name).await.unwrap().data;
-                let account = imported.to_account();
-                let _ = pg_handler.save_account(account, 0).await.unwrap();
+                if let Ok(imported) = rpc_handler.export_account(name).await {
+                    let account = imported.data.to_account();
+                    let _ = pg_handler.save_account(account, 0).await.unwrap();
+                }
             }
-        },
+        }
         _ => unimplemented!(),
     }
     Ok(())
