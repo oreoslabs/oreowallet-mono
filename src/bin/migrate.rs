@@ -4,7 +4,7 @@ use ironfish_server::{
     config::DbConfig,
     db_handler::{DBHandler, PgHandler, RedisClient, REDIS_ACCOUNT_KEY},
     handle_signals, initialize_logger,
-    rpc_handler::RpcHandler,
+    rpc_handler::{abi::ImportAccountReq, RpcHandler},
 };
 
 #[derive(Parser, Debug, Clone)]
@@ -46,8 +46,12 @@ async fn main() -> Result<()> {
         "redis" => {
             for (_, name) in accounts_v0.into_iter() {
                 if let Ok(imported) = rpc_handler.export_account(name).await {
-                    let account = imported.data.account.to_account();
-                    let _ = redis_handler.save_account(account, 0).await.unwrap();
+                    let account = imported.data.account;
+                    let account: ImportAccountReq = serde_json::from_str(&account).unwrap();
+                    let _ = redis_handler
+                        .save_account(account.to_account(), 0)
+                        .await
+                        .unwrap();
                 }
             }
         }
@@ -55,8 +59,12 @@ async fn main() -> Result<()> {
             let pg_handler = PgHandler::from_config(&DbConfig::load(dconfig).unwrap());
             for (_, name) in accounts_v0.into_iter() {
                 if let Ok(imported) = rpc_handler.export_account(name).await {
-                    let account = imported.data.account.to_account();
-                    let _ = pg_handler.save_account(account, 0).await.unwrap();
+                    let account = imported.data.account;
+                    let account: ImportAccountReq = serde_json::from_str(&account).unwrap();
+                    let _ = pg_handler
+                        .save_account(account.to_account(), 0)
+                        .await
+                        .unwrap();
                 }
             }
         }

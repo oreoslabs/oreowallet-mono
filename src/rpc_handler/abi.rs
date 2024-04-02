@@ -39,8 +39,9 @@ pub struct ImportAccountReq {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExportAccountRep {
-    pub account: ImportAccountReq,
+    pub account: String,
 }
 
 impl ImportAccountReq {
