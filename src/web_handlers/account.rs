@@ -23,8 +23,6 @@ pub async fn import_vk_handler<T: DBHandler>(
 ) -> impl IntoResponse {
     let account_name = shared
         .db_handler
-        .lock()
-        .await
         .save_account(import.clone().to_account(), 0)
         .await;
     if let Err(e) = account_name {
@@ -59,8 +57,6 @@ pub async fn remove_account_handler<T: DBHandler>(
 ) -> impl IntoResponse {
     let db_account = shared
         .db_handler
-        .lock()
-        .await
         .get_account(remove_account.account.clone())
         .await;
     if let Err(e) = db_account {
@@ -78,8 +74,6 @@ pub async fn remove_account_handler<T: DBHandler>(
         Ok(response) => {
             if let Err(e) = shared
                 .db_handler
-                .lock()
-                .await
                 .remove_account(remove_account.account.clone())
                 .await
             {
@@ -97,8 +91,6 @@ pub async fn get_balances_handler<T: DBHandler>(
 ) -> impl IntoResponse {
     let db_account = shared
         .db_handler
-        .lock()
-        .await
         .get_account(get_balance.account.clone())
         .await;
     if let Err(e) = db_account {
@@ -129,8 +121,6 @@ pub async fn get_ores_handler<T: DBHandler>(
 ) -> impl IntoResponse {
     let db_account = shared
         .db_handler
-        .lock()
-        .await
         .get_account(get_balance.account.clone())
         .await;
     if let Err(e) = db_account {
@@ -161,8 +151,6 @@ pub async fn get_transactions_handler<T: DBHandler>(
 ) -> impl IntoResponse {
     let db_account = shared
         .db_handler
-        .lock()
-        .await
         .get_account(get_transactions.account.clone())
         .await;
     if let Err(e) = db_account {
@@ -185,8 +173,6 @@ pub async fn create_transaction_handler<T: DBHandler>(
 ) -> impl IntoResponse {
     let db_account = shared
         .db_handler
-        .lock()
-        .await
         .get_account(create_transaction.account.clone())
         .await;
     if let Err(e) = db_account {
@@ -236,12 +222,7 @@ pub async fn account_status_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(account): extract::Json<GetAccountStatusReq>,
 ) -> impl IntoResponse {
-    let db_account = shared
-        .db_handler
-        .lock()
-        .await
-        .get_account(account.account.clone())
-        .await;
+    let db_account = shared.db_handler.get_account(account.account.clone()).await;
     if let Err(e) = db_account {
         return e.into_response();
     }
@@ -275,12 +256,7 @@ pub async fn account_transaction_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(account): extract::Json<GetAccountTransactionReq>,
 ) -> impl IntoResponse {
-    let db_account = shared
-        .db_handler
-        .lock()
-        .await
-        .get_account(account.account.clone())
-        .await;
+    let db_account = shared.db_handler.get_account(account.account.clone()).await;
     if let Err(e) = db_account {
         return e.into_response();
     }

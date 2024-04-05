@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use anyhow::Result;
 use axum::{
@@ -7,13 +7,9 @@ use axum::{
     routing::{get, post},
     BoxError, Router,
 };
-use config::DbConfig;
-use db_handler::{DBHandler, RedisClient};
+use db_handler::{DBHandler, PgHandler};
 use rpc_handler::RpcHandler;
-use tokio::{
-    net::TcpListener,
-    sync::{oneshot, Mutex},
-};
+use tokio::{net::TcpListener, sync::oneshot};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
@@ -35,7 +31,7 @@ pub mod web_handlers;
 
 #[derive(Debug, Clone)]
 pub struct SharedState<T: DBHandler> {
-    pub db_handler: Arc<Mutex<T>>,
+    pub db_handler: T,
     pub rpc_handler: RpcHandler,
 }
 
@@ -45,15 +41,18 @@ where
 {
     pub fn new(db_handler: T, endpoint: &str) -> Self {
         Self {
-            db_handler: Arc::new(Mutex::new(db_handler)),
+            db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
         }
     }
 }
 
-pub async fn run_server(listen: SocketAddr, rpc_server: String, config: &DbConfig) -> Result<()> {
-    let redis_handler = RedisClient::from_config(config);
-    let shared_state = SharedState::new(redis_handler, &rpc_server);
+pub async fn run_server(
+    listen: SocketAddr,
+    rpc_server: String,
+    db_handler: PgHandler,
+) -> Result<()> {
+    let shared_state = SharedState::new(db_handler, &rpc_server);
     let router = Router::new()
         .route("/import", post(import_vk_handler))
         .route("/remove", post(remove_account_handler))
