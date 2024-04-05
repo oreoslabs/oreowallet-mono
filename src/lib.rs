@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, time::Duration};
 
 use anyhow::Result;
 use axum::{
@@ -7,13 +7,9 @@ use axum::{
     routing::{get, post},
     BoxError, Router,
 };
-use config::DbConfig;
-use db_handler::{DBHandler, RedisClient};
+use db_handler::{DBHandler, PgHandler};
 use rpc_handler::RpcHandler;
-use tokio::{
-    net::TcpListener,
-    sync::{oneshot, Mutex},
-};
+use tokio::{net::TcpListener, sync::oneshot};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
@@ -35,7 +31,7 @@ pub mod web_handlers;
 
 #[derive(Debug, Clone)]
 pub struct SharedState<T: DBHandler> {
-    pub db_handler: Arc<Mutex<T>>,
+    pub db_handler: T,
     pub rpc_handler: RpcHandler,
 }
 
@@ -45,15 +41,18 @@ where
 {
     pub fn new(db_handler: T, endpoint: &str) -> Self {
         Self {
-            db_handler: Arc::new(Mutex::new(db_handler)),
+            db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
         }
     }
 }
 
-pub async fn run_server(listen: SocketAddr, rpc_server: String, config: &DbConfig) -> Result<()> {
-    let redis_handler = RedisClient::from_config(config);
-    let shared_state = SharedState::new(redis_handler, &rpc_server);
+pub async fn run_server(
+    listen: SocketAddr,
+    rpc_server: String,
+    db_handler: PgHandler,
+) -> Result<()> {
+    let shared_state = SharedState::new(db_handler, &rpc_server);
     let router = Router::new()
         .route("/import", post(import_vk_handler))
         .route("/remove", post(remove_account_handler))
@@ -378,17 +377,4 @@ mod tests {
         let status = response.status();
         assert_eq!(status.as_u16(), 900);
     }
-
-    // account used for tests
-    //     Mnemonic  eight fog reward cat spoon lawsuit mention mean number wine female asthma adapt flush salad slam rib desert goddess flame code pass turn route
-    //  Spending Key  46eb4ae291ed28fc62c44e977f7153870030b3af9658b8e77590ac22d1417ab5
-    //      View Key  4ae4eb9606ba57b3b17a444100a9ac6453cd67e6fe4c860e63a2e18b1200978ab5ecce68e8639d5016cbe73b0ea9a3c8e906fc881af2e9ccfa7a7b63fb73d555
-    //   Incoming View Key  4a08bec0ec5a471352f340d737e4b3baec2aec8d0a2e12201d92d8ad71aadd07
-    //   Outgoing View Key  cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7
-    //       Address  d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64
-
-    const VK: &str = "4ae4eb9606ba57b3b17a444100a9ac6453cd67e6fe4c860e63a2e18b1200978ab5ecce68e8639d5016cbe73b0ea9a3c8e906fc881af2e9ccfa7a7b63fb73d555";
-    const IN_VK: &str = "4a08bec0ec5a471352f340d737e4b3baec2aec8d0a2e12201d92d8ad71aadd07";
-    const OUT_VK: &str = "cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7";
-    const ADDRESS: &str = "d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64";
 }

@@ -21,6 +21,13 @@ pub async fn import_vk_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(import): extract::Json<ImportAccountReq>,
 ) -> impl IntoResponse {
+    let account_name = shared
+        .db_handler
+        .save_account(import.clone().to_account(), 0)
+        .await;
+    if let Err(e) = account_name {
+        return e.into_response();
+    }
     let ImportAccountReq {
         view_key,
         incoming_view_key,
@@ -28,14 +35,6 @@ pub async fn import_vk_handler<T: DBHandler>(
         public_address,
         created_at,
     } = import;
-    let account_name = shared
-        .db_handler
-        .lock()
-        .await
-        .save_account(public_address.clone(), 0);
-    if let Err(e) = account_name {
-        return e.into_response();
-    }
     let rpc_data = RpcImportReq {
         view_key,
         incoming_view_key,
@@ -56,18 +55,17 @@ pub async fn remove_account_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(remove_account): extract::Json<RemoveAccountReq>,
 ) -> impl IntoResponse {
-    let account_name = shared
+    let db_account = shared
         .db_handler
-        .lock()
-        .await
-        .get_account(remove_account.account.clone());
-    if let Err(e) = account_name {
+        .get_account(remove_account.account.clone())
+        .await;
+    if let Err(e) = db_account {
         return e.into_response();
     }
     let result = shared
         .rpc_handler
         .remove_account(RpcRemoveAccountReq {
-            account: account_name.unwrap().name,
+            account: db_account.unwrap().name,
             confirm: Some(true),
             wait: Some(true),
         })
@@ -76,9 +74,8 @@ pub async fn remove_account_handler<T: DBHandler>(
         Ok(response) => {
             if let Err(e) = shared
                 .db_handler
-                .lock()
-                .await
                 .remove_account(remove_account.account.clone())
+                .await
             {
                 return e.into_response();
             }
@@ -92,18 +89,17 @@ pub async fn get_balances_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(get_balance): extract::Json<GetBalancesReq>,
 ) -> impl IntoResponse {
-    let account_name = shared
+    let db_account = shared
         .db_handler
-        .lock()
-        .await
-        .get_account(get_balance.account.clone());
-    if let Err(e) = account_name {
+        .get_account(get_balance.account.clone())
+        .await;
+    if let Err(e) = db_account {
         return e.into_response();
     }
     let resp = shared
         .rpc_handler
         .get_balance(GetBalancesReq {
-            account: account_name.unwrap().name,
+            account: db_account.unwrap().name,
             confirmations: Some(get_balance.confirmations.unwrap_or(10)),
         })
         .await;
@@ -123,18 +119,17 @@ pub async fn get_ores_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(get_balance): extract::Json<GetBalancesReq>,
 ) -> impl IntoResponse {
-    let account_name = shared
+    let db_account = shared
         .db_handler
-        .lock()
-        .await
-        .get_account(get_balance.account.clone());
-    if let Err(e) = account_name {
+        .get_account(get_balance.account.clone())
+        .await;
+    if let Err(e) = db_account {
         return e.into_response();
     }
     let resp = shared
         .rpc_handler
         .get_balance(GetBalancesReq {
-            account: account_name.unwrap().name,
+            account: db_account.unwrap().name,
             confirmations: Some(get_balance.confirmations.unwrap_or(10)),
         })
         .await;
@@ -154,18 +149,17 @@ pub async fn get_transactions_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(get_transactions): extract::Json<GetTransactionsReq>,
 ) -> impl IntoResponse {
-    let account_name = shared
+    let db_account = shared
         .db_handler
-        .lock()
-        .await
-        .get_account(get_transactions.account.clone());
-    if let Err(e) = account_name {
+        .get_account(get_transactions.account.clone())
+        .await;
+    if let Err(e) = db_account {
         return e.into_response();
     }
     shared
         .rpc_handler
         .get_transactions(GetTransactionsReq {
-            account: account_name.unwrap().name,
+            account: db_account.unwrap().name,
             limit: Some(get_transactions.limit.unwrap_or(6)),
             reverse: Some(true),
         })
@@ -177,12 +171,11 @@ pub async fn create_transaction_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(create_transaction): extract::Json<CreateTxReq>,
 ) -> impl IntoResponse {
-    let account_name = shared
+    let db_account = shared
         .db_handler
-        .lock()
-        .await
-        .get_account(create_transaction.account.clone());
-    if let Err(e) = account_name {
+        .get_account(create_transaction.account.clone())
+        .await;
+    if let Err(e) = db_account {
         return e.into_response();
     }
     let outputs: Vec<OutPut> = create_transaction
@@ -203,7 +196,7 @@ pub async fn create_transaction_handler<T: DBHandler>(
     shared
         .rpc_handler
         .create_transaction(CreateTxReq {
-            account: account_name.unwrap().name,
+            account: db_account.unwrap().name,
             outputs: Some(outputs),
             fee: Some(create_transaction.fee.unwrap_or("1".into())),
             expiration_delta: Some(create_transaction.expiration_delta.unwrap_or(30)),
@@ -229,18 +222,14 @@ pub async fn account_status_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(account): extract::Json<GetAccountStatusReq>,
 ) -> impl IntoResponse {
-    let account_name = shared
-        .db_handler
-        .lock()
-        .await
-        .get_account(account.account.clone());
-    if let Err(e) = account_name {
+    let db_account = shared.db_handler.get_account(account.account.clone()).await;
+    if let Err(e) = db_account {
         return e.into_response();
     }
     shared
         .rpc_handler
         .get_account_status(GetAccountStatusReq {
-            account: account_name.unwrap().name,
+            account: db_account.unwrap().name,
         })
         .await
         .into_response()
@@ -267,18 +256,14 @@ pub async fn account_transaction_handler<T: DBHandler>(
     State(shared): State<SharedState<T>>,
     extract::Json(account): extract::Json<GetAccountTransactionReq>,
 ) -> impl IntoResponse {
-    let account_name = shared
-        .db_handler
-        .lock()
-        .await
-        .get_account(account.account.clone());
-    if let Err(e) = account_name {
+    let db_account = shared.db_handler.get_account(account.account.clone()).await;
+    if let Err(e) = db_account {
         return e.into_response();
     }
     let rpc_transaction = shared
         .rpc_handler
         .get_account_transaction(GetAccountTransactionReq {
-            account: account_name.unwrap().name,
+            account: db_account.unwrap().name,
             hash: account.hash,
             notes: Some(true),
         })

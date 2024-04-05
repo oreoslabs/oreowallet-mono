@@ -2,7 +2,11 @@ use std::net::SocketAddr;
 
 use anyhow::Result;
 use clap::Parser;
-use ironfish_server::{config::DbConfig, handle_signals, initialize_logger, run_server};
+use ironfish_server::{
+    config::DbConfig,
+    db_handler::{DBHandler, PgHandler},
+    handle_signals, initialize_logger, run_server,
+};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Command {
@@ -32,6 +36,7 @@ async fn main() -> Result<()> {
     initialize_logger(verbosity);
     handle_signals().await?;
     let db_config = DbConfig::load(config).unwrap();
-    run_server(listen.into(), node, &db_config).await?;
+    let db_handler = PgHandler::from_config(&db_config);
+    run_server(listen.into(), node, db_handler).await?;
     Ok(())
 }

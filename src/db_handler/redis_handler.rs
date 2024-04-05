@@ -1,119 +1,94 @@
-use std::{collections::HashMap, time::Duration};
-use substring::Substring;
-use thiserror::Error;
-use tracing::info;
-
-use r2d2_redis::{
-    r2d2,
-    redis::{Commands, FromRedisValue},
-    RedisConnectionManager,
+use redis::{
+    aio::MultiplexedConnection, AsyncCommands, Client, ErrorKind, FromRedisValue, RedisResult,
 };
+use std::collections::HashMap;
+use substring::Substring;
+use tracing::info;
 
 use super::{Account, DBHandler};
 use crate::{config::DbConfig, error::OreoError};
 
-pub type R2D2Pool = r2d2::Pool<RedisConnectionManager>;
-pub type R2D2Con = r2d2::PooledConnection<RedisConnectionManager>;
-
-const CACHE_POOL_MIN_IDLE: u32 = 8;
-const CACHE_POOL_TIMEOUT_SECONDS: u64 = 3;
-const CACHE_POOL_EXPIRE_SECONDS: u64 = 1;
-
 pub const REDIS_ACCOUNT_KEY: &str = "IRONACCOUNT";
-
-#[derive(Error, Debug)]
-pub enum R2D2Error {
-    #[error("could not get redis connection from pool : {0}")]
-    RedisPoolError(r2d2_redis::r2d2::Error),
-    #[error("error parsing string from redis result: {0}")]
-    RedisTypeError(r2d2_redis::redis::RedisError),
-    #[error("error executing redis command: {0}")]
-    RedisCMDError(r2d2_redis::redis::RedisError),
-    #[error("error creating Redis client: {0}")]
-    RedisClientError(r2d2_redis::redis::RedisError),
-}
+pub const REDIS_ACCOUNT_KEY_V1: &str = "IRONACCOUNTV1";
 
 #[derive(Debug, Clone)]
 pub struct RedisClient {
-    pub pool: r2d2::Pool<RedisConnectionManager>,
+    pub db_name: String,
+    pub client: Client,
 }
 
 impl RedisClient {
-    pub fn connect(url: &str, max_connections: u32) -> Result<Self, R2D2Error> {
-        let manager = RedisConnectionManager::new(url).map_err(R2D2Error::RedisClientError)?;
-        let pool = r2d2::Pool::builder()
-            .max_size(max_connections)
-            .max_lifetime(Some(Duration::from_secs(CACHE_POOL_EXPIRE_SECONDS)))
-            .min_idle(Some(CACHE_POOL_MIN_IDLE))
-            .build(manager)
-            .map_err(|e| R2D2Error::RedisPoolError(e).into())?;
-        Ok(Self { pool })
+    pub fn connect(url: &str, _max_connections: u32) -> RedisResult<Self> {
+        let client = Client::open(url)?;
+        Ok(Self {
+            client,
+            db_name: REDIS_ACCOUNT_KEY_V1.to_string(),
+        })
     }
 
-    pub fn get_con(&self) -> Result<R2D2Con, R2D2Error> {
-        self.pool
-            .get_timeout(Duration::from_secs(CACHE_POOL_TIMEOUT_SECONDS))
-            .map_err(|e| {
-                eprintln!("error connecting to redis: {}", e);
-                R2D2Error::RedisPoolError(e).into()
-            })
+    pub async fn get_con(&self) -> RedisResult<MultiplexedConnection> {
+        self.client.get_multiplexed_async_connection().await
     }
 
-    pub fn set_str(&self, key: &str, value: &str, ttl_seconds: usize) -> Result<(), R2D2Error> {
-        let mut con = self.get_con()?;
-        con.set(key, value).map_err(R2D2Error::RedisCMDError)?;
+    pub async fn set_str(&self, key: &str, value: &str, ttl_seconds: i64) -> RedisResult<()> {
+        let mut con = self.get_con().await?;
+        con.set(key, value).await?;
         if ttl_seconds > 0 {
-            con.expire(key, ttl_seconds)
-                .map_err(R2D2Error::RedisCMDError)?;
+            con.expire(key, ttl_seconds).await?;
         }
         Ok(())
     }
 
-    pub fn hset(&self, key: &str, field: &str, value: &str) -> Result<(), R2D2Error> {
-        let mut con = self.get_con()?;
-        con.hset(key, field, value)
-            .map_err(R2D2Error::RedisCMDError)?;
-        Ok(())
+    pub async fn hset(&self, key: &str, field: &str, value: &str) -> RedisResult<()> {
+        let mut con = self.get_con().await?;
+        con.hset(key, field, value).await
     }
 
-    pub fn hget(&self, key: &str, field: &str) -> Result<String, R2D2Error> {
-        let mut con = self.get_con()?;
-        let val = con.hget(key, field).map_err(R2D2Error::RedisCMDError)?;
-        FromRedisValue::from_redis_value(&val).map_err(|e| R2D2Error::RedisTypeError(e).into())
+    pub async fn hget(&self, key: &str, field: &str) -> RedisResult<String> {
+        let mut con = self.get_con().await?;
+        con.hget(key, field).await
     }
 
-    pub fn hgetall(&self, key: &str) -> Result<HashMap<String, String>, R2D2Error> {
-        let mut con = self.get_con()?;
-        let vals: HashMap<String, String> = con.hgetall(key).map_err(R2D2Error::RedisCMDError)?;
-        Ok(vals)
+    pub async fn hgetall(&self, key: &str) -> RedisResult<HashMap<String, String>> {
+        let mut con = self.get_con().await?;
+        let val = con.hgetall(key).await?;
+        FromRedisValue::from_redis_value(&val)
     }
 
-    pub fn hdel(&self, key: &str, field: &str) -> Result<(), R2D2Error> {
-        let mut con = self.get_con()?;
-        con.hdel(key, field).map_err(R2D2Error::RedisCMDError)?;
-        Ok(())
+    pub async fn hdel(&self, key: &str, field: &str) -> RedisResult<()> {
+        let mut con = self.get_con().await?;
+        con.hdel(key, field).await
     }
 
-    pub fn get_str(&self, key: &str) -> Result<String, R2D2Error> {
-        let mut con = self.get_con()?;
-        let value = con.get(key).map_err(R2D2Error::RedisCMDError)?;
-        FromRedisValue::from_redis_value(&value).map_err(|e| R2D2Error::RedisTypeError(e).into())
+    pub async fn get_str(&self, key: &str) -> RedisResult<String> {
+        let mut con = self.get_con().await?;
+        let value = con.get(key).await?;
+        FromRedisValue::from_redis_value(&value)
     }
 }
 
+#[async_trait::async_trait]
 impl DBHandler for RedisClient {
-    fn save_account(&self, address: String, _worker_id: u32) -> Result<String, OreoError> {
-        match self.hget(REDIS_ACCOUNT_KEY, &address) {
+    async fn save_account(&self, account: Account, _worker_id: u32) -> Result<String, OreoError> {
+        let address = account.address.clone();
+        match self.hget(&self.db_name, &address).await {
             Ok(_) => {
                 return Err(OreoError::Duplicate(address));
             }
-            Err(e) => match e {
-                R2D2Error::RedisPoolError(_) => return Err(OreoError::DBError),
-                _ => info!("Ready to save new account, {}", address),
-            },
+            Err(e) => {
+                if e.is_connection_dropped() {
+                    return Err(OreoError::DBError);
+                };
+                info!("Ready to save new account, {}", address);
+            }
         }
         let account_name = address_to_name(&address);
-        if let Err(_) = self.hset(REDIS_ACCOUNT_KEY, &address, &account_name) {
+        let str_account = serde_json::to_string(&account);
+        if str_account.is_err() {
+            return Err(OreoError::SeralizeError(address));
+        };
+        let str_account = str_account.unwrap();
+        if let Err(_) = self.hset(&self.db_name, &address, &str_account).await {
             return Err(OreoError::DBError);
         }
         info!(
@@ -123,47 +98,123 @@ impl DBHandler for RedisClient {
         Ok(account_name)
     }
 
-    fn get_account(&self, address: String) -> Result<Account, OreoError> {
-        match self.hget(REDIS_ACCOUNT_KEY, &address) {
-            Ok(name) => Ok(Account::redis_mock(name)),
-            Err(e) => match e {
-                R2D2Error::RedisPoolError(_) => Err(OreoError::DBError),
-                _ => Err(OreoError::NoImported(address)),
-            },
-        }
-    }
-
-    fn remove_account(&self, address: String) -> Result<String, OreoError> {
-        match self.hget(REDIS_ACCOUNT_KEY, &address) {
-            Ok(name) => {
-                // should never panic
-                self.hdel(REDIS_ACCOUNT_KEY, &address).unwrap();
-                Ok(name)
+    async fn get_account(&self, address: String) -> Result<Account, OreoError> {
+        match self.hget(&self.db_name, &address).await {
+            Ok(data) => {
+                let account = serde_json::from_str::<Account>(&data);
+                if account.is_err() {
+                    Err(OreoError::ParseError(address))
+                } else {
+                    Ok(account.unwrap())
+                }
             }
-            Err(e) => match e {
-                R2D2Error::RedisPoolError(_) => Err(OreoError::DBError),
-                _ => Err(OreoError::NoImported(address)),
+            Err(e) => match e.kind() {
+                ErrorKind::TypeError => Err(OreoError::NoImported(address)),
+                _ => Err(OreoError::DBError),
             },
         }
     }
 
-    fn get_accounts(&self, _filter_head: u32) -> Result<Vec<Account>, OreoError> {
-        match self.hgetall(REDIS_ACCOUNT_KEY) {
-            Ok(accounts) => Ok(accounts
-                .values()
-                .into_iter()
-                .map(|account| Account::redis_mock(account.to_string()))
-                .collect()),
-            Err(_) => Err(OreoError::DBError),
+    async fn remove_account(&self, address: String) -> Result<String, OreoError> {
+        match self.hget(&self.db_name, &address).await {
+            Ok(_) => {
+                // should never panic
+                self.hdel(&self.db_name, &address).await.unwrap();
+                Ok(address_to_name(&address))
+            }
+            Err(e) => match e.kind() {
+                ErrorKind::TypeError => Err(OreoError::NoImported(address)),
+                _ => Err(OreoError::DBError),
+            },
         }
     }
 
     fn from_config(config: &DbConfig) -> Self {
         info!("Redis handler selected");
-        RedisClient::connect(&config.server_url(), config.max_connections).unwrap()
+        RedisClient::connect(&config.server_url(), config.default_pool_size).unwrap()
     }
 }
 
 pub fn address_to_name(address: &str) -> String {
     address.substring(0, 10).into()
+}
+
+#[cfg(test)]
+mod tests {
+
+    // account used for tests
+    //     Mnemonic  eight fog reward cat spoon lawsuit mention mean number wine female asthma adapt flush salad slam rib desert goddess flame code pass turn route
+    //  Spending Key  46eb4ae291ed28fc62c44e977f7153870030b3af9658b8e77590ac22d1417ab5
+    //      View Key  4ae4eb9606ba57b3b17a444100a9ac6453cd67e6fe4c860e63a2e18b1200978ab5ecce68e8639d5016cbe73b0ea9a3c8e906fc881af2e9ccfa7a7b63fb73d555
+    //   Incoming View Key  4a08bec0ec5a471352f340d737e4b3baec2aec8d0a2e12201d92d8ad71aadd07
+    //   Outgoing View Key  cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7
+    //       Address  d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64
+
+    use super::address_to_name;
+    use super::RedisClient;
+    use crate::config::DbConfig;
+    use crate::constants::MAINNET_GENESIS_HASH;
+    use crate::constants::MAINNET_GENESIS_SEQUENCE;
+    use crate::db_handler::Account;
+    use crate::db_handler::DBHandler;
+    use crate::error::OreoError;
+
+    const VK: &str = "4ae4eb9606ba57b3b17a444100a9ac6453cd67e6fe4c860e63a2e18b1200978ab5ecce68e8639d5016cbe73b0ea9a3c8e906fc881af2e9ccfa7a7b63fb73d555";
+    const IN_VK: &str = "4a08bec0ec5a471352f340d737e4b3baec2aec8d0a2e12201d92d8ad71aadd07";
+    const OUT_VK: &str = "cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7";
+    const ADDRESS: &str = "d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64";
+
+    fn get_test_account() -> Account {
+        Account {
+            name: address_to_name(ADDRESS),
+            create_head: None,
+            create_hash: None,
+            head: MAINNET_GENESIS_SEQUENCE,
+            hash: MAINNET_GENESIS_HASH.to_string(),
+            in_vk: IN_VK.to_string(),
+            out_vk: OUT_VK.to_string(),
+            vk: VK.to_string(),
+            address: ADDRESS.to_string(),
+        }
+    }
+
+    fn get_tdb() -> RedisClient {
+        let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
+        let db_handler = RedisClient::from_config(&config);
+        db_handler
+    }
+
+    #[tokio::test]
+    async fn save_account_should_work_redis() {
+        let t_account = get_test_account();
+        let db_handler = get_tdb();
+        let saved_name = db_handler.save_account(t_account.clone(), 0).await;
+        assert!(saved_name.is_ok());
+    }
+
+    #[tokio::test]
+    async fn get_account_should_work_redis() {
+        let t_account = get_test_account();
+        let db_handler = get_tdb();
+        let saved_account = db_handler.get_account(ADDRESS.to_string()).await.unwrap();
+        assert_eq!(t_account, saved_account);
+    }
+
+    #[tokio::test]
+    async fn remove_account_should_work_redis() {
+        let db_handler = get_tdb();
+        let account_name = address_to_name(ADDRESS);
+        let removed_name = db_handler
+            .remove_account(ADDRESS.to_string())
+            .await
+            .unwrap();
+        assert_eq!(account_name, removed_name);
+
+        // this get_account should be error
+        let should_error_account = db_handler.get_account(ADDRESS.to_string()).await;
+        assert!(should_error_account.is_err());
+        let should_error_account = should_error_account.err().unwrap();
+        let expected = OreoError::NoImported(ADDRESS.to_string());
+        assert_eq!(expected, should_error_account);
+    }
 }
