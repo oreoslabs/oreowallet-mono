@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use axum::{
@@ -8,11 +8,12 @@ use axum::{
     BoxError, Router,
 };
 use db_handler::{DBHandler, PgHandler};
+use manager::Manager;
 use rpc_handler::RpcHandler;
-use tokio::{net::TcpListener, sync::oneshot};
+use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use crate::web_handlers::{
@@ -25,6 +26,7 @@ pub mod config;
 pub mod constants;
 pub mod db_handler;
 pub mod error;
+pub mod manager;
 pub mod orescriptions;
 pub mod rpc_handler;
 pub mod web_handlers;
@@ -51,8 +53,70 @@ pub async fn run_server(
     listen: SocketAddr,
     rpc_server: String,
     db_handler: PgHandler,
+    dlistener: SocketAddr,
 ) -> Result<()> {
-    let shared_state = SharedState::new(db_handler, &rpc_server);
+    let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server));
+    let manager = Manager::new(shared_resource.clone());
+    let listener = TcpListener::bind(&dlistener).await.unwrap();
+
+    // dworker connection handler
+    let (router, handler) = oneshot::channel();
+    let dworker_manager = manager.clone();
+    let dworker_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        loop {
+            match listener.accept().await {
+                Ok((stream, ip)) => {
+                    info!("new connection from {}", ip);
+                    if let Err(e) = Manager::handle_stream(stream, dworker_manager.clone()).await {
+                        error!("failed to handle stream, {e}");
+                    }
+                }
+                Err(e) => error!("failed to accept connection, {:?}", e),
+            }
+        }
+    });
+    let _ = handler.await;
+
+    // scheduling decryption task
+
+    // rescheduling uncompleted task
+
+    // manager status updater
+    let status_manager = manager.clone();
+    let (router, handler) = oneshot::channel();
+    let status_update_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        loop {
+            {
+                let workers = status_manager.workers.read().await;
+                let workers: Vec<&String> = workers.keys().collect();
+                let pending_taskes = status_manager.task_queue.read().await.len();
+                info!("online workers: {}, {:?}", workers.len(), workers);
+                info!("pending taskes in queue: {}", pending_taskes);
+            }
+            sleep(Duration::from_secs(10)).await;
+        }
+    });
+    let _ = handler.await;
+
+    // restful api handler
+    let (router, handler) = oneshot::channel();
+    let rest_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        let _ = start_rest_service(listen, shared_resource.clone()).await;
+    });
+    let _ = handler.await;
+
+    let _ = tokio::join!(dworker_handler, rest_handler, status_update_handler);
+    std::future::pending::<()>().await;
+    Ok(())
+}
+
+pub async fn start_rest_service(
+    listen: SocketAddr,
+    shared_state: Arc<SharedState<PgHandler>>,
+) -> Result<()> {
     let router = Router::new()
         .route("/import", post(import_vk_handler))
         .route("/remove", post(remove_account_handler))
@@ -64,7 +128,7 @@ pub async fn run_server(
         .route("/accountStatus", post(account_status_handler))
         .route("/latestBlock", get(latest_block_handler))
         .route("/ores", post(get_ores_handler))
-        .with_state(shared_state)
+        .with_state(shared_state.clone())
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|_: BoxError| async {

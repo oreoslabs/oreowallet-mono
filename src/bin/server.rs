@@ -10,9 +10,12 @@ use ironfish_server::{
 
 #[derive(Parser, Debug, Clone)]
 pub struct Command {
-    /// The ip:port server will listen on
+    /// The ip:port server will listen on for restful api
     #[clap(short, long, default_value = "0.0.0.0:10001")]
     pub listen: SocketAddr,
+    /// The ip:port server will listen on for dworker
+    #[clap(long, default_value = "0.0.0.0:10002")]
+    pub dlisten: SocketAddr,
     /// The path to db config file
     #[clap(short, long)]
     pub config: String,
@@ -29,6 +32,7 @@ async fn main() -> Result<()> {
     let args = Command::parse();
     let Command {
         listen,
+        dlisten,
         config,
         verbosity,
         node,
@@ -37,6 +41,6 @@ async fn main() -> Result<()> {
     handle_signals().await?;
     let db_config = DbConfig::load(config).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
-    run_server(listen.into(), node, db_handler).await?;
+    run_server(listen.into(), node, db_handler, dlisten.into()).await?;
     Ok(())
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{self, State},
     response::IntoResponse,
@@ -18,7 +20,7 @@ use crate::{
 use super::abi::{GetAccountStatusReq, GetTransactionDetail, ImportAccountReq, RemoveAccountReq};
 
 pub async fn import_vk_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(import): extract::Json<ImportAccountReq>,
 ) -> impl IntoResponse {
     let account_name = shared
@@ -52,7 +54,7 @@ pub async fn import_vk_handler<T: DBHandler>(
 }
 
 pub async fn remove_account_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(remove_account): extract::Json<RemoveAccountReq>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -86,7 +88,7 @@ pub async fn remove_account_handler<T: DBHandler>(
 }
 
 pub async fn get_balances_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(get_balance): extract::Json<GetBalancesReq>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -116,7 +118,7 @@ pub async fn get_balances_handler<T: DBHandler>(
 }
 
 pub async fn get_ores_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(get_balance): extract::Json<GetBalancesReq>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -146,7 +148,7 @@ pub async fn get_ores_handler<T: DBHandler>(
 }
 
 pub async fn get_transactions_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(get_transactions): extract::Json<GetTransactionsReq>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -168,7 +170,7 @@ pub async fn get_transactions_handler<T: DBHandler>(
 }
 
 pub async fn create_transaction_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(create_transaction): extract::Json<CreateTxReq>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -208,7 +210,7 @@ pub async fn create_transaction_handler<T: DBHandler>(
 }
 
 pub async fn broadcast_transaction_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(broadcast_transaction): extract::Json<BroadcastTxReq>,
 ) -> impl IntoResponse {
     shared
@@ -219,7 +221,7 @@ pub async fn broadcast_transaction_handler<T: DBHandler>(
 }
 
 pub async fn account_status_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(account): extract::Json<GetAccountStatusReq>,
 ) -> impl IntoResponse {
     let db_account = shared.db_handler.get_account(account.account.clone()).await;
@@ -236,13 +238,13 @@ pub async fn account_status_handler<T: DBHandler>(
 }
 
 pub async fn latest_block_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
 ) -> impl IntoResponse {
     shared.rpc_handler.get_latest_block().await.into_response()
 }
 
 pub async fn note_witness_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(req): extract::Json<GetNoteWitnessReq>,
 ) -> impl IntoResponse {
     shared
@@ -253,7 +255,7 @@ pub async fn note_witness_handler<T: DBHandler>(
 }
 
 pub async fn account_transaction_handler<T: DBHandler>(
-    State(shared): State<SharedState<T>>,
+    State(shared): State<Arc<SharedState<T>>>,
     extract::Json(account): extract::Json<GetAccountTransactionReq>,
 ) -> impl IntoResponse {
     let db_account = shared.db_handler.get_account(account.account.clone()).await;
