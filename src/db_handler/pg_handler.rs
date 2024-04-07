@@ -17,7 +17,7 @@ impl PgHandler {
 
     pub async fn insert(&self, account: Account) -> Result<String, sqlx::Error> {
         let result = sqlx::query(
-            "INSERT INTO wallet.account (name, create_head, create_hash, head, hash, in_vk, out_vk, vk, address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING address"
+            "INSERT INTO wallet.account (name, create_head, create_hash, head, hash, in_vk, out_vk, vk, address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING name"
         )
         .bind(account.name.clone())
         .bind(account.create_head.clone())
@@ -44,7 +44,7 @@ impl PgHandler {
 
     pub async fn update_one(&self, state: Account) -> Result<String, sqlx::Error> {
         let result = sqlx::query(
-            "UPDATE wallet.account SET head = $1, hash = $2 WHERE address = $3 RETURNING address",
+            "UPDATE wallet.account SET head = $1, hash = $2 WHERE address = $3 RETURNING name",
         )
         .bind(state.head)
         .bind(state.hash.clone())
@@ -56,7 +56,7 @@ impl PgHandler {
     }
 
     pub async fn delete(&self, address: String) -> Result<String, sqlx::Error> {
-        let result = sqlx::query("DELETE FROM wallet.account WHERE address = $1 RETURNING address")
+        let result = sqlx::query("DELETE FROM wallet.account WHERE address = $1 RETURNING name")
             .bind(address)
             .fetch_one(&self.pool)
             .await?
