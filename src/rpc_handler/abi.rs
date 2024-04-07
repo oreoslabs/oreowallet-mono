@@ -299,3 +299,21 @@ pub struct GetNoteWitnessRep {
     pub root_hash: String,
     pub auth_path: Vec<AuthPath>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportTransactionReq {
+    pub account: String,
+    pub transaction_hash: String,
+    pub block_hash: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ImportTransactionRep {
+    pub imported: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdateHeadHashRep {
+    pub updated: bool,
+}

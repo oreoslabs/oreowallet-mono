@@ -129,6 +129,10 @@ impl DBHandler for RedisClient {
         }
     }
 
+    async fn update_account_head(&self, name: String, new_head: i64, new_hash: String) -> Result<String, OreoError> {
+        unimplemented!()
+    }
+
     fn from_config(config: &DbConfig) -> Self {
         info!("Redis handler selected");
         RedisClient::connect(&config.server_url(), config.default_pool_size).unwrap()

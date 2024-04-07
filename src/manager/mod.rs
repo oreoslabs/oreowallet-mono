@@ -16,9 +16,12 @@ use tokio::{
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::{debug, error, info, warn};
 
-use crate::{db_handler::PgHandler, manager::codec::DMessage, SharedState};
+use crate::{
+    db_handler::{DBHandler, PgHandler}, manager::codec::DMessage, rpc_handler::abi::ImportTransactionReq,
+    SharedState,
+};
 
-use self::codec::{DMessageCodec, DRequest};
+use self::codec::{DMessageCodec, DRequest, DResponse};
 
 #[derive(Debug, Clone)]
 pub struct ServerWorker {
@@ -37,6 +40,7 @@ impl ServerWorker {
 pub struct TaskInfo {
     pub timestampt: u64,
     pub hash: String,
+    pub sequence: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -116,6 +120,7 @@ impl Manager {
                                         let task_id = response.id.clone();
                                         info!("task {} response from worker {}", task_id, worker_name);
                                         // handle decryption result
+
                                         match worker_server.task_queue.write().await.pop() {
                                             Some(task) => {
                                                 let _ = tx.send(task).await.unwrap();
@@ -137,6 +142,72 @@ impl Manager {
             error!("worker {} main loop exit", worker_name);
         });
         let _ = handler.await;
+        Ok(())
+    }
+
+    pub async fn update_account(&self, response: DResponse) -> Result<()> {
+        let DResponse { id, data, account } = response;
+        let mapping = self.task_mapping.read().await;
+        let block_info = mapping.get(&id);
+        if block_info.is_none() {
+            // this can be caused by unexpected restart things.
+            error!("task_id missed in task_mapping");
+            return Ok(());
+        }
+        let block_info = block_info.unwrap();
+        let block_hash = block_info.hash.to_string();
+        let sequence = block_info.sequence;
+        // we should have only one account in single task
+        // all account in DResponse.data should be the same one
+        if data.is_empty() {
+            let res = self
+                .shared
+                .rpc_handler
+                .update_head(account.clone(), block_hash.clone())
+                .await;
+            match res {
+                Ok(res) => {
+                    if res.data.updated {
+                        let _ = self.shared.db_handler.update_account_head(account.clone(), sequence, block_hash.clone()).await;
+                        let _ = self.task_mapping.write().await.remove(&id).unwrap();
+                        debug!("account head updated, {}", account);
+                    } else {
+                        error!("failed to update account head in node");
+                    }
+                }
+                Err(e) => error!("failed to update account head, {:?}", e),
+            }
+            return Ok(());
+        }
+
+        for tx_hash in data.iter() {
+            let imported = self
+                .shared
+                .rpc_handler
+                .import_transaction(ImportTransactionReq {
+                    account: account.clone(),
+                    block_hash: block_hash.clone(),
+                    transaction_hash: tx_hash.to_string(),
+                })
+                .await;
+            match imported {
+                Ok(raw) => {
+                    if raw.data.imported {
+                        let _ = self.shared.db_handler.update_account_head(account.clone(), sequence, block_hash.clone()).await;
+                        let _ = self.task_mapping.write().await.remove(&id).unwrap();
+                        debug!(
+                            "transaction {} of account {} imported successfully",
+                            tx_hash, account
+                        );
+                    } else {
+                        error!("failed to import transaction in node");
+                    }
+                }
+                Err(e) => {
+                    error!("failed to import transaction, {:?}", e);
+                }
+            }
+        }
         Ok(())
     }
 }

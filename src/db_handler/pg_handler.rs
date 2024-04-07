@@ -42,6 +42,15 @@ impl PgHandler {
         Ok(result)
     }
 
+    pub async fn get_one_by_name(&self, name: String) -> Result<Account, sqlx::Error> {
+        let result =
+            sqlx::query_as::<_, Account>("SELECT * FROM wallet.account WHERE name = $1")
+                .bind(name)
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(result)
+    }
+
     pub async fn update_one(&self, state: Account) -> Result<String, sqlx::Error> {
         let result = sqlx::query(
             "UPDATE wallet.account SET head = $1, hash = $2 WHERE address = $3 RETURNING name",
@@ -104,6 +113,20 @@ impl DBHandler for PgHandler {
             sqlx::Error::RowNotFound => OreoError::NoImported(address),
             _ => OreoError::DBError,
         })
+    }
+
+    async fn update_account_head(&self, name: String, new_head: i64, new_hash: String) -> Result<String, OreoError> {
+        match self.get_one_by_name(name.clone()).await {
+            Ok(mut account) => {
+                account.head = new_head;
+                account.hash = new_hash;
+                self.update_one(account).await.map_err(|e| match e {
+                    sqlx::Error::RowNotFound => OreoError::NoImported(name),
+                    _ => OreoError::DBError,
+                })
+            },
+            Err(_) => Err(OreoError::NoImported(name))
+        }
     }
 }
 

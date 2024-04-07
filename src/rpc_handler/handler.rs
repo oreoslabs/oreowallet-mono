@@ -152,6 +152,29 @@ impl RpcHandler {
             .send_json(json!({"account": account, "format": "JSON".to_string()}));
         handle_response(resp)
     }
+
+    pub async fn import_transaction(
+        &self,
+        req: ImportTransactionReq,
+    ) -> Result<RpcResponse<ImportTransactionRep>, OreoError> {
+        let path = format!("http://{}/chain/importTransaction", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(&req);
+        handle_response(resp)
+    }
+
+    pub async fn update_head(
+        &self,
+        account: String,
+        block_hash: String,
+    ) -> Result<RpcResponse<UpdateHeadHashRep>, OreoError> {
+        let path = format!("http://{}/chain/updateHeadHash", self.endpoint);
+        let resp = self
+            .agent
+            .clone()
+            .post(&path)
+            .send_json(json!({"account": account, "blockHash": block_hash}));
+        handle_response(resp)
+    }
 }
 
 pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(

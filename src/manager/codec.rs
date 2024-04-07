@@ -19,6 +19,7 @@ pub struct SingleRequest {
     pub current_note_index: Option<u64>,
     pub decrypt_for_spender: bool,
     pub tx_hash: String,
+    pub account: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -30,15 +31,10 @@ pub struct DRequest {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct SingleResponse {
-    pub tx_hash: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
-#[serde(rename_all = "camelCase")]
 pub struct DResponse {
+    pub account: String,
     pub id: String,
-    pub data: Vec<SingleResponse>,
+    pub data: Vec<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

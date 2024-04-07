@@ -19,6 +19,8 @@ pub trait DBHandler {
     async fn get_account(&self, address: String) -> Result<Account, OreoError>;
     /// Remove account from db
     async fn remove_account(&self, address: String) -> Result<String, OreoError>;
+    /// Update account head in db
+    async fn update_account_head(&self, name: String, new_head: i64, new_hash: String) -> Result<String, OreoError>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
