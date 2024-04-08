@@ -129,8 +129,23 @@ impl DBHandler for RedisClient {
         }
     }
 
-    async fn update_account_head(&self, name: String, new_head: i64, new_hash: String) -> Result<String, OreoError> {
-        unimplemented!()
+    async fn update_account_head(
+        &self,
+        address: String,
+        new_head: i64,
+        new_hash: String,
+    ) -> Result<String, OreoError> {
+        if let Ok(mut acc) = self.get_account(address.clone()).await {
+            acc.head = new_head;
+            acc.hash = new_hash;
+            let str_account = serde_json::to_string(&acc).unwrap();
+            if let Err(_) = self.hset(&self.db_name, &address, &str_account).await {
+                return Err(OreoError::DBError);
+            }
+            Ok(acc.name.clone())
+        } else {
+            Err(OreoError::NoImported(address))
+        }
     }
 
     fn from_config(config: &DbConfig) -> Self {
