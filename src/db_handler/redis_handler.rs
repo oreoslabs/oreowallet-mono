@@ -148,6 +148,30 @@ impl DBHandler for RedisClient {
         }
     }
 
+    async fn get_oldest_accounts(&self) -> Result<Vec<Account>, OreoError> {
+        let all_accounts_map = self.hgetall(&self.db_name).await;
+        match all_accounts_map {
+            Ok(data) => {
+                let mut result = vec![];
+                let mut oldest_head = 1000000000;
+                for acc_str in data.values() {
+                    let acc = serde_json::from_str::<Account>(acc_str).unwrap();
+                    if acc.head < oldest_head {
+                        oldest_head = acc.head;
+                    }
+                }
+                for acc_str in data.values() {
+                    let acc = serde_json::from_str::<Account>(acc_str).unwrap();
+                    if acc.head <= oldest_head {
+                        result.push(acc);
+                    }
+                }
+                Ok(result)
+            }
+            Err(_) => Err(OreoError::DBError),
+        }
+    }
+
     fn from_config(config: &DbConfig) -> Self {
         info!("Redis handler selected");
         RedisClient::connect(&config.server_url(), config.default_pool_size).unwrap()

@@ -71,6 +71,15 @@ impl PgHandler {
             .get(0);
         Ok(result)
     }
+
+    pub async fn find_many_with_oldest_head(&self) -> Result<Vec<Account>, sqlx::Error> {
+        let result = sqlx::query_as(
+            "SELECT * FROM wallet.account WHERE head = (SELECT MIN(head) FROM wallet.account)",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -131,6 +140,12 @@ impl DBHandler for PgHandler {
             }
             Err(_) => Err(OreoError::NoImported(address)),
         }
+    }
+
+    async fn get_oldest_accounts(&self) -> Result<Vec<Account>, OreoError> {
+        self.find_many_with_oldest_head()
+            .await
+            .map_err(|_| OreoError::DBError)
     }
 }
 
