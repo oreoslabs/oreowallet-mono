@@ -17,7 +17,9 @@ use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    db_handler::{DBHandler, PgHandler}, manager::codec::DMessage, rpc_handler::abi::ImportTransactionReq,
+    db_handler::{address_to_name, DBHandler, PgHandler},
+    manager::codec::DMessage,
+    rpc_handler::abi::ImportTransactionReq,
     SharedState,
 };
 
@@ -117,10 +119,7 @@ impl Manager {
                                     },
                                     DMessage::DRequest(_) => error!("invalid message from worker, should never happen"),
                                     DMessage::DResponse(response) => {
-                                        let task_id = response.id.clone();
-                                        info!("task {} response from worker {}", task_id, worker_name);
-                                        // handle decryption result
-
+                                        let _ = worker_server.update_account(response).await;
                                         match worker_server.task_queue.write().await.pop() {
                                             Some(task) => {
                                                 let _ = tx.send(task).await.unwrap();
@@ -146,7 +145,8 @@ impl Manager {
     }
 
     pub async fn update_account(&self, response: DResponse) -> Result<()> {
-        let DResponse { id, data, account } = response;
+        let DResponse { id, data, address } = response;
+        let account = address_to_name(&address);
         let mapping = self.task_mapping.read().await;
         let block_info = mapping.get(&id);
         if block_info.is_none() {
@@ -168,7 +168,11 @@ impl Manager {
             match res {
                 Ok(res) => {
                     if res.data.updated {
-                        let _ = self.shared.db_handler.update_account_head(account.clone(), sequence, block_hash.clone()).await;
+                        let _ = self
+                            .shared
+                            .db_handler
+                            .update_account_head(address.clone(), sequence, block_hash.clone())
+                            .await;
                         let _ = self.task_mapping.write().await.remove(&id).unwrap();
                         debug!("account head updated, {}", account);
                     } else {
@@ -193,7 +197,11 @@ impl Manager {
             match imported {
                 Ok(raw) => {
                     if raw.data.imported {
-                        let _ = self.shared.db_handler.update_account_head(account.clone(), sequence, block_hash.clone()).await;
+                        let _ = self
+                            .shared
+                            .db_handler
+                            .update_account_head(address.clone(), sequence, block_hash.clone())
+                            .await;
                         let _ = self.task_mapping.write().await.remove(&id).unwrap();
                         debug!(
                             "transaction {} of account {} imported successfully",
