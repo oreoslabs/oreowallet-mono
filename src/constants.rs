@@ -6,3 +6,5 @@ pub const OREOSRIPTIONS_ENDPOINT: &str = "http://localhost:20001/api";
 pub const MAINNET_GENESIS_HASH: &str =
     "eac623b099b8081d2bde92d43a4a7795385c94e2c0ae4097ef488972e83ff2b3";
 pub const MAINNET_GENESIS_SEQUENCE: i64 = 1;
+pub const REORG_DEPTH: i64 = 10;
+pub const SECONDARY_BATCH: i64 = 500;

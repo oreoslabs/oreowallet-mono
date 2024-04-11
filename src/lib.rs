@@ -7,9 +7,11 @@ use axum::{
     routing::{get, post},
     BoxError, Router,
 };
-use db_handler::{DBHandler, PgHandler};
-use manager::Manager;
-use rpc_handler::RpcHandler;
+use chrono::Utc;
+use constants::{REORG_DEPTH, SECONDARY_BATCH};
+use db_handler::{Account, DBHandler, PgHandler};
+use manager::{codec::DRequest, Manager, TaskInfo};
+use rpc_handler::{abi::RpcTransaction, RpcHandler};
 use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
@@ -49,6 +51,37 @@ where
     }
 }
 
+pub async fn scheduling_tasks(
+    manager: Arc<Manager>,
+    account: &Account,
+    block_hash: &str,
+    block_sequence: i64,
+    transactions: &Vec<RpcTransaction>,
+) {
+    for tx in transactions.iter() {
+        let task = DRequest::new(account, tx);
+        let task_id = task.id.clone();
+        let _ = manager.task_mapping.write().await.insert(
+            task_id,
+            TaskInfo {
+                timestampt: Utc::now().timestamp(),
+                hash: block_hash.to_string(),
+                sequence: block_sequence,
+            },
+        );
+        for (_k, worker) in manager.workers.read().await.iter() {
+            if worker.status == 1 {
+                if let Err(e) = worker.router.send(task.clone()).await {
+                    error!("failed to send task to manager {}", e);
+                } else {
+                    return;
+                }
+            }
+        }
+        let _ = manager.task_queue.write().await.push(task);
+    }
+}
+
 pub async fn run_server(
     listen: SocketAddr,
     rpc_server: String,
@@ -78,7 +111,81 @@ pub async fn run_server(
     });
     let _ = handler.await;
 
-    // scheduling decryption task
+    // chain reorg loop
+    // remove forked block and roll back account.head
+
+    // primary loop
+    // scheduling decryption task for accounts whos head within [latest.block.sequence - REORG_DEPTH, latest.block.sequence]
+
+    // secondary loop
+    // scheduling decryption task for accounts whos head jump out [latest.block.sequence - REORG_DEPTH, latest.block.sequence]
+    let (router, handler) = oneshot::channel();
+    let secondary_scheduling_manager = manager.clone();
+    let secondary_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        loop {
+            if let Ok(accounts) = secondary_scheduling_manager
+                .shared
+                .db_handler
+                .get_oldest_accounts()
+                .await
+            {
+                let chain_head = secondary_scheduling_manager
+                    .shared
+                    .rpc_handler
+                    .get_latest_block()
+                    .await
+                    .unwrap()
+                    .data
+                    .current_block_identifier;
+                let account_head = accounts[0].head;
+                if account_head < chain_head.index.parse::<i64>().unwrap() - REORG_DEPTH {
+                    let start_seq = account_head + 1;
+                    let end_seq = account_head + SECONDARY_BATCH;
+                    for seq in start_seq..end_seq {
+                        let mut should_break = false;
+                        if let Ok(response) = secondary_scheduling_manager
+                            .shared
+                            .rpc_handler
+                            .get_block(seq)
+                            .await
+                        {
+                            let previous_block_hash = response.data.block.previous_block_hash;
+                            let current_block_hash = response.data.block.hash;
+                            let transactions = response.data.block.transactions;
+                            for acc in accounts.iter() {
+                                if acc.hash != previous_block_hash.clone() {
+                                    let _ = secondary_scheduling_manager
+                                        .shared
+                                        .db_handler
+                                        .update_account_head(
+                                            acc.address.clone(),
+                                            seq - 1,
+                                            previous_block_hash.clone(),
+                                        )
+                                        .await;
+                                    should_break = true;
+                                } else {
+                                    let _ = scheduling_tasks(
+                                        secondary_scheduling_manager.clone(),
+                                        &acc,
+                                        &current_block_hash,
+                                        seq - 1,
+                                        &transactions,
+                                    )
+                                    .await;
+                                }
+                            }
+                            if should_break {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+    let _ = handler.await;
 
     // rescheduling uncompleted task
 
@@ -108,7 +215,12 @@ pub async fn run_server(
     });
     let _ = handler.await;
 
-    let _ = tokio::join!(dworker_handler, rest_handler, status_update_handler);
+    let _ = tokio::join!(
+        dworker_handler,
+        rest_handler,
+        status_update_handler,
+        secondary_handler
+    );
     std::future::pending::<()>().await;
     Ok(())
 }

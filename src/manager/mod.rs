@@ -1,4 +1,4 @@
-mod codec;
+pub mod codec;
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -40,7 +40,7 @@ impl ServerWorker {
 
 #[derive(Debug, Clone)]
 pub struct TaskInfo {
-    pub timestampt: u64,
+    pub timestampt: i64,
     pub hash: String,
     pub sequence: i64,
 }

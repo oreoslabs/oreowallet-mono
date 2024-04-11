@@ -3,6 +3,12 @@ use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use tokio_util::codec::{Decoder, Encoder};
+use uuid::Uuid;
+
+use crate::{
+    db_handler::Account,
+    rpc_handler::abi::{RpcEncryptedNote, RpcTransaction},
+};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct RegisterWorker {
@@ -16,10 +22,23 @@ pub struct SingleRequest {
     pub incoming_view_key: String,
     pub outgoing_view_key: String,
     pub view_key: String,
-    pub current_note_index: Option<u64>,
     pub decrypt_for_spender: bool,
     pub tx_hash: String,
     pub address: String,
+}
+
+impl SingleRequest {
+    pub fn new(account: &Account, tx_hash: &str, note: &RpcEncryptedNote) -> Self {
+        Self {
+            incoming_view_key: account.in_vk.to_string(),
+            outgoing_view_key: account.out_vk.to_string(),
+            view_key: account.vk.to_string(),
+            decrypt_for_spender: true,
+            tx_hash: tx_hash.to_string(),
+            address: account.address.to_string(),
+            serialized_note: note.serialized.to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -27,6 +46,21 @@ pub struct SingleRequest {
 pub struct DRequest {
     pub id: String,
     pub data: Vec<SingleRequest>,
+}
+
+impl DRequest {
+    pub fn new(account: &Account, transaction: &RpcTransaction) -> Self {
+        let tx_hash = &transaction.hash;
+        let data = transaction
+            .notes
+            .iter()
+            .map(|note| SingleRequest::new(account, tx_hash, note))
+            .collect();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            data,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
