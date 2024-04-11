@@ -175,6 +175,15 @@ impl RpcHandler {
             .send_json(json!({"account": account, "blockHash": block_hash}));
         handle_response(resp)
     }
+
+    pub async fn get_block(&self, sequence: i64) -> Result<RpcResponse<GetBlockRep>, OreoError> {
+        let path = format!("http://{}/chain/getBlock", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(GetBlockReq {
+            sequence,
+            serialized: Some(true),
+        });
+        handle_response(resp)
+    }
 }
 
 pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(

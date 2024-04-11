@@ -317,3 +317,35 @@ pub struct ImportTransactionRep {
 pub struct UpdateHeadHashRep {
     pub updated: bool,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetBlockReq {
+    pub sequence: i64,
+    pub serialized: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcEncryptedNote {
+    pub hash: String,
+    pub serialized: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcTransaction {
+    pub hash: String,
+    pub notes: Vec<RpcEncryptedNote>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcBlock {
+    pub hash: String,
+    pub sequence: u32,
+    pub previous_block_hash: String,
+    pub transactions: Vec<RpcTransaction>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GetBlockRep {
+    pub block: RpcBlock,
+}
