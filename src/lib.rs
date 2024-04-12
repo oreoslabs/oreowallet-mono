@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{cmp, net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use axum::{
@@ -141,7 +141,10 @@ pub async fn run_server(
                 let account_head = accounts[0].head;
                 if account_head < chain_head.index.parse::<i64>().unwrap() - REORG_DEPTH {
                     let start_seq = account_head + 1;
-                    let end_seq = account_head + SECONDARY_BATCH;
+                    let end_seq = cmp::min(
+                        account_head + SECONDARY_BATCH,
+                        chain_head.index.parse::<i64>().unwrap() - REORG_DEPTH,
+                    );
                     for seq in start_seq..end_seq {
                         let mut should_break = false;
                         if let Ok(response) = secondary_scheduling_manager
@@ -170,7 +173,7 @@ pub async fn run_server(
                                         secondary_scheduling_manager.clone(),
                                         &acc,
                                         &current_block_hash,
-                                        seq - 1,
+                                        seq,
                                         &transactions,
                                     )
                                     .await;
