@@ -28,6 +28,8 @@ pub trait DBHandler {
     ) -> Result<String, OreoError>;
     /// Get accounts with oldest head
     async fn get_oldest_accounts(&self) -> Result<Vec<Account>, OreoError>;
+    /// Get accounts with head filter
+    async fn get_accounts_with_head(&self, start_head: i64) -> Result<Vec<Account>, OreoError>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]

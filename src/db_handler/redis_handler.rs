@@ -172,6 +172,23 @@ impl DBHandler for RedisClient {
         }
     }
 
+    async fn get_accounts_with_head(&self, start_head: i64) -> Result<Vec<Account>, OreoError> {
+        let all_accounts_map = self.hgetall(&self.db_name).await;
+        match all_accounts_map {
+            Ok(data) => {
+                let mut result = vec![];
+                for acc_str in data.values() {
+                    let acc = serde_json::from_str::<Account>(acc_str).unwrap();
+                    if acc.head >= start_head {
+                        result.push(acc);
+                    }
+                }
+                Ok(result)
+            }
+            Err(_) => Err(OreoError::DBError),
+        }
+    }
+
     fn from_config(config: &DbConfig) -> Self {
         info!("Redis handler selected");
         RedisClient::connect(&config.server_url(), config.default_pool_size).unwrap()

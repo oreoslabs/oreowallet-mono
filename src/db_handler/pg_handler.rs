@@ -80,6 +80,14 @@ impl PgHandler {
         .await?;
         Ok(result)
     }
+
+    pub async fn find_many_with_head_filter(&self, head: i64) -> Result<Vec<Account>, sqlx::Error> {
+        let result = sqlx::query_as("SELECT * FROM wallet.account WHERE head >= $1")
+            .bind(head)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -144,6 +152,12 @@ impl DBHandler for PgHandler {
 
     async fn get_oldest_accounts(&self) -> Result<Vec<Account>, OreoError> {
         self.find_many_with_oldest_head()
+            .await
+            .map_err(|_| OreoError::DBError)
+    }
+
+    async fn get_accounts_with_head(&self, start_head: i64) -> Result<Vec<Account>, OreoError> {
+        self.find_many_with_head_filter(start_head)
             .await
             .map_err(|_| OreoError::DBError)
     }
