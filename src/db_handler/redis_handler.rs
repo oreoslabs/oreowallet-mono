@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use substring::Substring;
 use tracing::info;
 
-use super::{Account, DBHandler};
+use super::{Account, DBHandler, UnstableAccount};
 use crate::{config::DbConfig, error::OreoError};
 
 pub const REDIS_ACCOUNT_KEY: &str = "IRONACCOUNT";
@@ -187,6 +187,14 @@ impl DBHandler for RedisClient {
             }
             Err(_) => Err(OreoError::DBError),
         }
+    }
+
+    async fn get_primary_account(
+        &self,
+        address: String,
+        sequence: i64,
+    ) -> Result<UnstableAccount, OreoError> {
+        unimplemented!("Redis is deprecated now!")
     }
 
     fn from_config(config: &DbConfig) -> Self {

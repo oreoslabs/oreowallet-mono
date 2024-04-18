@@ -30,6 +30,12 @@ pub trait DBHandler {
     async fn get_oldest_accounts(&self) -> Result<Vec<Account>, OreoError>;
     /// Get accounts with head filter
     async fn get_accounts_with_head(&self, start_head: i64) -> Result<Vec<Account>, OreoError>;
+    /// Get account from primary table (unstable)
+    async fn get_primary_account(
+        &self,
+        address: String,
+        sequence: i64,
+    ) -> Result<UnstableAccount, OreoError>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
@@ -44,4 +50,12 @@ pub struct Account {
     pub out_vk: String,
     pub vk: String,
     pub address: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct UnstableAccount {
+    pub address: String,
+    pub sequence: i64,
+    pub hash: String,
 }

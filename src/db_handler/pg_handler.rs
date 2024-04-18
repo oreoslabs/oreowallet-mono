@@ -3,7 +3,7 @@ use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 
 use crate::error::OreoError;
 
-use super::{Account, DBHandler};
+use super::{Account, DBHandler, UnstableAccount};
 
 #[derive(Debug, Clone)]
 pub struct PgHandler {
@@ -88,6 +88,21 @@ impl PgHandler {
             .await?;
         Ok(result)
     }
+
+    pub async fn get_one_from_primary(
+        &self,
+        address: String,
+        sequence: i64,
+    ) -> Result<UnstableAccount, sqlx::Error> {
+        let result = sqlx::query_as::<_, UnstableAccount>(
+            "SELECT * FROM wallet.primarychain WHERE address = $1 AND sequence = $2",
+        )
+        .bind(address)
+        .bind(sequence)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -160,6 +175,19 @@ impl DBHandler for PgHandler {
         self.find_many_with_head_filter(start_head)
             .await
             .map_err(|_| OreoError::DBError)
+    }
+
+    async fn get_primary_account(
+        &self,
+        address: String,
+        sequence: i64,
+    ) -> Result<UnstableAccount, OreoError> {
+        self.get_one_from_primary(address.clone(), sequence)
+            .await
+            .map_err(|e| match e {
+                sqlx::Error::RowNotFound => OreoError::NoImported(address),
+                _ => OreoError::DBError,
+            })
     }
 }
 
