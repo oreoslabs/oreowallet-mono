@@ -111,11 +111,140 @@ pub async fn run_server(
     });
     let _ = handler.await;
 
-    // chain reorg loop
-    // remove forked block and roll back account.head
-
     // primary loop
     // scheduling decryption task for accounts whos head within [latest.block.sequence - REORG_DEPTH, latest.block.sequence]
+    // chain reorg should be handled during primary scanning carefully
+    let (router, handler) = oneshot::channel();
+    let primary_scheduling_manager = manager.clone();
+    let primary_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        loop {
+            let chain_head = primary_scheduling_manager
+                .shared
+                .rpc_handler
+                .get_latest_block()
+                .await
+                .unwrap()
+                .data
+                .current_block_identifier;
+            let chain_height = chain_head.index.parse::<i64>().unwrap();
+            let start_seq = chain_height - REORG_DEPTH;
+            let end_seq = chain_height + 1;
+            if let Ok(accounts) = primary_scheduling_manager
+                .shared
+                .db_handler
+                .get_accounts_with_head(start_seq)
+                .await
+            {
+                for seq in start_seq..end_seq {
+                    let mut should_break = false;
+                    if let Ok(response) = primary_scheduling_manager
+                        .shared
+                        .rpc_handler
+                        .get_block(seq)
+                        .await
+                    {
+                        let current_block_hash = response.data.block.hash;
+                        let transactions = response.data.block.transactions;
+                        for acc in accounts.iter() {
+                            // Update account head/hash, createHead/hash for new created account
+                            if acc.head == seq
+                                && acc.create_head.is_some()
+                                && acc.create_head.unwrap() == seq
+                            {
+                                let _ = primary_scheduling_manager
+                                    .shared
+                                    .db_handler
+                                    .update_account_head(
+                                        acc.address.clone(),
+                                        seq,
+                                        current_block_hash.clone(),
+                                    )
+                                    .await;
+                                let _ = primary_scheduling_manager
+                                    .shared
+                                    .db_handler
+                                    .update_account__createdhead(
+                                        acc.address.clone(),
+                                        seq,
+                                        current_block_hash.clone(),
+                                    )
+                                    .await;
+                                continue;
+                            }
+
+                            // rollback to right onchain block for accounts on forked chain
+                            if acc.head == seq && acc.hash != current_block_hash.clone() {
+                                let mut sequence = seq;
+                                let mut hash = current_block_hash.clone();
+                                loop {
+                                    if acc.create_head.is_some()
+                                        && acc.create_head.unwrap() == sequence
+                                    {
+                                        let _ = primary_scheduling_manager
+                                            .shared
+                                            .db_handler
+                                            .update_account__createdhead(
+                                                acc.address.clone(),
+                                                sequence,
+                                                hash.clone(),
+                                            )
+                                            .await;
+                                        break;
+                                    }
+                                    if let Ok(unstable) = primary_scheduling_manager
+                                        .shared
+                                        .db_handler
+                                        .get_primary_account(acc.address.to_string(), sequence)
+                                        .await
+                                    {
+                                        if unstable.hash != hash.clone() {
+                                            let _ = primary_scheduling_manager
+                                                .shared
+                                                .db_handler
+                                                .del_primary_account(acc.address.clone(), sequence)
+                                                .await;
+                                            sequence -= 1;
+                                            hash = primary_scheduling_manager
+                                                .shared
+                                                .rpc_handler
+                                                .get_block(sequence)
+                                                .await
+                                                .unwrap()
+                                                .data
+                                                .block
+                                                .hash;
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                }
+                                let _ = primary_scheduling_manager
+                                    .shared
+                                    .db_handler
+                                    .update_account_head(acc.address.clone(), sequence, hash)
+                                    .await;
+                                should_break = true;
+                            } else {
+                                let _ = scheduling_tasks(
+                                    primary_scheduling_manager.clone(),
+                                    &acc,
+                                    &current_block_hash,
+                                    seq,
+                                    &transactions,
+                                )
+                                .await;
+                            }
+                        }
+                        if should_break {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    let _ = handler.await;
 
     // secondary loop
     // scheduling decryption task for accounts whos head jump out [latest.block.sequence - REORG_DEPTH, latest.block.sequence]
@@ -140,7 +269,7 @@ pub async fn run_server(
                     .current_block_identifier;
                 let account_head = accounts[0].head;
                 if account_head < chain_head.index.parse::<i64>().unwrap() - REORG_DEPTH {
-                    let start_seq = account_head + 1;
+                    let start_seq = account_head;
                     let end_seq = cmp::min(
                         account_head + SECONDARY_BATCH,
                         chain_head.index.parse::<i64>().unwrap() - REORG_DEPTH,
@@ -157,7 +286,12 @@ pub async fn run_server(
                             let current_block_hash = response.data.block.hash;
                             let transactions = response.data.block.transactions;
                             for acc in accounts.iter() {
-                                if acc.hash != previous_block_hash.clone() {
+                                // this should never happen in secondary_scheduling
+                                if acc.hash != current_block_hash.clone() {
+                                    warn!(
+                                        "block hash doesn't match, unexpected chain reorg happens."
+                                    );
+                                    warn!("should never happen in secondary_scheduling");
                                     let _ = secondary_scheduling_manager
                                         .shared
                                         .db_handler
@@ -222,6 +356,7 @@ pub async fn run_server(
         dworker_handler,
         rest_handler,
         status_update_handler,
+        primary_handler,
         secondary_handler
     );
     std::future::pending::<()>().await;
