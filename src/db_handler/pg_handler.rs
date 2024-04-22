@@ -33,6 +33,18 @@ impl PgHandler {
         Ok(result)
     }
 
+    pub async fn insert_primary(&self, account: UnstableAccount) -> Result<String, sqlx::Error> {
+        let result = sqlx::query(
+            "INSERT INTO wallet.primarychain (sequence, hash, address) VALUES ($1, $2, $3) RETURNING address"
+        )
+        .bind(account.sequence)
+        .bind(account.hash.clone())
+        .bind(account.address.clone())
+        .fetch_one(&self.pool)
+        .await?.get(0);
+        Ok(result)
+    }
+
     pub async fn get_one(&self, address: String) -> Result<Account, sqlx::Error> {
         let result =
             sqlx::query_as::<_, Account>("SELECT * FROM wallet.account WHERE address = $1")
@@ -69,6 +81,22 @@ impl PgHandler {
             .fetch_one(&self.pool)
             .await?
             .get(0);
+        Ok(result)
+    }
+
+    pub async fn delete_primary(
+        &self,
+        address: String,
+        sequence: i64,
+    ) -> Result<String, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM wallet.primarychain WHERE address = $1 AND sequence = $2 RETURNING address",
+        )
+        .bind(address)
+        .bind(sequence)
+        .fetch_one(&self.pool)
+        .await?
+        .get(0);
         Ok(result)
     }
 
@@ -188,6 +216,25 @@ impl DBHandler for PgHandler {
                 sqlx::Error::RowNotFound => OreoError::NoImported(address),
                 _ => OreoError::DBError,
             })
+    }
+
+    async fn del_primary_account(
+        &self,
+        address: String,
+        sequence: i64,
+    ) -> Result<String, OreoError> {
+        self.delete_primary(address.clone(), sequence)
+            .await
+            .map_err(|e| match e {
+                sqlx::Error::RowNotFound => OreoError::NoImported(address),
+                _ => OreoError::DBError,
+            })
+    }
+
+    async fn add_primary_account(&self, account: UnstableAccount) -> Result<String, OreoError> {
+        self.insert_primary(account)
+            .await
+            .map_err(|_| OreoError::DBError)
     }
 }
 

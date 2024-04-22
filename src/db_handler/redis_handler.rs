@@ -194,7 +194,19 @@ impl DBHandler for RedisClient {
         address: String,
         sequence: i64,
     ) -> Result<UnstableAccount, OreoError> {
-        unimplemented!("Redis is deprecated now!")
+        unimplemented!("Redis is deprecated for such feature!")
+    }
+
+    async fn del_primary_account(
+        &self,
+        address: String,
+        sequence: i64,
+    ) -> Result<String, OreoError> {
+        unimplemented!("Redis is deprecated for such feature!")
+    }
+
+    async fn add_primary_account(&self, account: UnstableAccount) -> Result<String, OreoError> {
+        unimplemented!("Redis is deprecated for such feature!")
     }
 
     fn from_config(config: &DbConfig) -> Self {

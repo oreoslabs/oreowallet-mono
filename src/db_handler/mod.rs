@@ -36,6 +36,14 @@ pub trait DBHandler {
         address: String,
         sequence: i64,
     ) -> Result<UnstableAccount, OreoError>;
+    /// Delete account info in primary table (unstable)
+    async fn del_primary_account(
+        &self,
+        address: String,
+        sequence: i64,
+    ) -> Result<String, OreoError>;
+    /// Add account info to primary table (unstable)
+    async fn add_primary_account(&self, account: UnstableAccount) -> Result<String, OreoError>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
