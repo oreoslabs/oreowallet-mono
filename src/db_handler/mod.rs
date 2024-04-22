@@ -44,6 +44,13 @@ pub trait DBHandler {
     ) -> Result<String, OreoError>;
     /// Add account info to primary table (unstable)
     async fn add_primary_account(&self, account: UnstableAccount) -> Result<String, OreoError>;
+    /// Update account created info
+    async fn update_account__createdhead(
+        &self,
+        address: String,
+        new_head: i64,
+        new_hash: String,
+    ) -> Result<String, OreoError>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]

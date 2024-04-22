@@ -209,6 +209,15 @@ impl DBHandler for RedisClient {
         unimplemented!("Redis is deprecated for such feature!")
     }
 
+    async fn update_account__createdhead(
+        &self,
+        address: String,
+        new_head: i64,
+        new_hash: String,
+    ) -> Result<String, OreoError> {
+        unimplemented!("Redis is deprecated for such feature!")
+    }
+
     fn from_config(config: &DbConfig) -> Self {
         info!("Redis handler selected");
         RedisClient::connect(&config.server_url(), config.default_pool_size).unwrap()

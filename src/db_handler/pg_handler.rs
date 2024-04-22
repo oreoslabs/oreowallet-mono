@@ -64,10 +64,12 @@ impl PgHandler {
 
     pub async fn update_one(&self, state: Account) -> Result<String, sqlx::Error> {
         let result = sqlx::query(
-            "UPDATE wallet.account SET head = $1, hash = $2 WHERE address = $3 RETURNING name",
+            "UPDATE wallet.account SET head = $1, hash = $2, create_head = $3, create_hash = $4 WHERE address = $5 RETURNING name",
         )
         .bind(state.head)
         .bind(state.hash.clone())
+        .bind(state.create_head)
+        .bind(state.create_hash.clone())
         .bind(state.address.clone())
         .fetch_one(&self.pool)
         .await?
@@ -235,6 +237,25 @@ impl DBHandler for PgHandler {
         self.insert_primary(account)
             .await
             .map_err(|_| OreoError::DBError)
+    }
+
+    async fn update_account__createdhead(
+        &self,
+        address: String,
+        new_head: i64,
+        new_hash: String,
+    ) -> Result<String, OreoError> {
+        match self.get_one(address.clone()).await {
+            Ok(mut account) => {
+                account.create_head = Some(new_head);
+                account.create_hash = Some(new_hash);
+                self.update_one(account).await.map_err(|e| match e {
+                    sqlx::Error::RowNotFound => OreoError::NoImported(address),
+                    _ => OreoError::DBError,
+                })
+            }
+            Err(_) => Err(OreoError::NoImported(address)),
+        }
     }
 }
 
