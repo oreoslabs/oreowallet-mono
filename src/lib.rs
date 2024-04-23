@@ -144,6 +144,11 @@ pub async fn run_server(
                 .get_accounts_with_head(start_seq)
                 .await
             {
+                if accounts.len() == 0 {
+                    info!("empty accounts to handle in primary_scheduling");
+                    sleep(Duration::from_secs(3)).await;
+                    continue;
+                }
                 for seq in start_seq..end_seq {
                     let mut should_break = false;
                     if let Ok(response) = primary_scheduling_manager
@@ -268,6 +273,11 @@ pub async fn run_server(
                 .get_oldest_accounts()
                 .await
             {
+                if accounts.len() == 0 {
+                    info!("empty accounts to handle in secondary_scheduling");
+                    sleep(Duration::from_secs(3)).await;
+                    continue;
+                }
                 let chain_head = secondary_scheduling_manager
                     .shared
                     .rpc_handler
