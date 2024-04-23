@@ -19,23 +19,13 @@ pub struct RegisterWorker {
 #[serde(rename_all = "camelCase")]
 pub struct SingleRequest {
     pub serialized_note: String,
-    pub incoming_view_key: String,
-    pub outgoing_view_key: String,
-    pub view_key: String,
-    pub decrypt_for_spender: bool,
     pub tx_hash: String,
-    pub address: String,
 }
 
 impl SingleRequest {
-    pub fn new(account: &Account, tx_hash: &str, note: &RpcEncryptedNote) -> Self {
+    pub fn new(tx_hash: &str, note: &RpcEncryptedNote) -> Self {
         Self {
-            incoming_view_key: account.in_vk.to_string(),
-            outgoing_view_key: account.out_vk.to_string(),
-            view_key: account.vk.to_string(),
-            decrypt_for_spender: true,
             tx_hash: tx_hash.to_string(),
-            address: account.address.to_string(),
             serialized_note: note.serialized.to_string(),
         }
     }
@@ -45,6 +35,11 @@ impl SingleRequest {
 #[serde(rename_all = "camelCase")]
 pub struct DRequest {
     pub id: String,
+    pub address: String,
+    pub incoming_view_key: String,
+    pub outgoing_view_key: String,
+    pub view_key: String,
+    pub decrypt_for_spender: bool,
     pub data: Vec<SingleRequest>,
 }
 
@@ -54,10 +49,15 @@ impl DRequest {
         let data = transaction
             .notes
             .iter()
-            .map(|note| SingleRequest::new(account, tx_hash, note))
+            .map(|note| SingleRequest::new(tx_hash, note))
             .collect();
         Self {
             id: Uuid::new_v4().to_string(),
+            address: account.address.clone(),
+            incoming_view_key: account.in_vk.clone(),
+            outgoing_view_key: account.out_vk.clone(),
+            view_key: account.vk.clone(),
+            decrypt_for_spender: true,
             data,
         }
     }
