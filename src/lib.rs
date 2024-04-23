@@ -60,6 +60,10 @@ pub async fn scheduling_tasks(
     transactions: &Vec<RpcTransaction>,
     status: u8,
 ) {
+    info!(
+        "scheduling task for account {} at sequence {}",
+        account.name, block_sequence
+    );
     for tx in transactions.iter() {
         let task = DRequest::new(account, tx);
         let task_id = task.id.clone();
@@ -293,6 +297,7 @@ pub async fn run_server(
                         account_head + SECONDARY_BATCH,
                         chain_head.index.parse::<i64>().unwrap() - REORG_DEPTH,
                     );
+                    info!("start scanning from {} to {}", start_seq, end_seq);
                     for seq in start_seq..end_seq {
                         let mut should_break = false;
                         if let Ok(response) = secondary_scheduling_manager
@@ -306,9 +311,9 @@ pub async fn run_server(
                             let transactions = response.data.block.transactions;
                             for acc in accounts.iter() {
                                 // this should never happen in secondary_scheduling
-                                if acc.hash != current_block_hash.clone() {
+                                if acc.head == seq && acc.hash != current_block_hash.clone() {
                                     warn!(
-                                        "block hash doesn't match, unexpected chain reorg happens."
+                                        "block hash doesn't match, unexpected chain reorg happens at sequence {}", seq
                                     );
                                     warn!("should never happen in secondary_scheduling");
                                     let _ = secondary_scheduling_manager
