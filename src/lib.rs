@@ -27,6 +27,7 @@ use crate::web_handlers::{
 pub mod config;
 pub mod constants;
 pub mod db_handler;
+pub mod dworkers;
 pub mod error;
 pub mod manager;
 pub mod orescriptions;
