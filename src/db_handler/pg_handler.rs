@@ -239,7 +239,7 @@ impl DBHandler for PgHandler {
             .map_err(|_| OreoError::DBError)
     }
 
-    async fn update_account__createdhead(
+    async fn update_account_createdhead(
         &self,
         address: String,
         new_head: i64,

@@ -209,7 +209,7 @@ impl DBHandler for RedisClient {
         unimplemented!("Redis is deprecated for such feature!")
     }
 
-    async fn update_account__createdhead(
+    async fn update_account_createdhead(
         &self,
         address: String,
         new_head: i64,

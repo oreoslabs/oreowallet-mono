@@ -45,7 +45,7 @@ pub trait DBHandler {
     /// Add account info to primary table (unstable)
     async fn add_primary_account(&self, account: UnstableAccount) -> Result<String, OreoError>;
     /// Update account created info
-    async fn update_account__createdhead(
+    async fn update_account_createdhead(
         &self,
         address: String,
         new_head: i64,

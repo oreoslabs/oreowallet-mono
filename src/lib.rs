@@ -171,7 +171,7 @@ pub async fn run_server(
                                 let _ = primary_scheduling_manager
                                     .shared
                                     .db_handler
-                                    .update_account__createdhead(
+                                    .update_account_createdhead(
                                         acc.address.clone(),
                                         seq,
                                         current_block_hash.clone(),
@@ -191,7 +191,7 @@ pub async fn run_server(
                                         let _ = primary_scheduling_manager
                                             .shared
                                             .db_handler
-                                            .update_account__createdhead(
+                                            .update_account_createdhead(
                                                 acc.address.clone(),
                                                 sequence,
                                                 hash.clone(),
