@@ -57,6 +57,7 @@ pub async fn scheduling_tasks(
     block_hash: &str,
     block_sequence: i64,
     transactions: &Vec<RpcTransaction>,
+    status: u8,
 ) {
     for tx in transactions.iter() {
         let task = DRequest::new(account, tx);
@@ -67,6 +68,7 @@ pub async fn scheduling_tasks(
                 timestampt: Utc::now().timestamp(),
                 hash: block_hash.to_string(),
                 sequence: block_sequence,
+                status,
             },
         );
         let mut task_scheduled = false;
@@ -237,6 +239,7 @@ pub async fn run_server(
                                     &current_block_hash,
                                     seq,
                                     &transactions,
+                                    0,
                                 )
                                 .await;
                             }
@@ -314,6 +317,7 @@ pub async fn run_server(
                                         &current_block_hash,
                                         seq,
                                         &transactions,
+                                        1,
                                     )
                                     .await;
                                 }

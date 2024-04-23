@@ -17,7 +17,7 @@ use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    db_handler::{address_to_name, DBHandler, PgHandler},
+    db_handler::{address_to_name, DBHandler, PgHandler, UnstableAccount},
     manager::codec::DMessage,
     rpc_handler::abi::ImportTransactionReq,
     SharedState,
@@ -43,6 +43,9 @@ pub struct TaskInfo {
     pub timestampt: i64,
     pub hash: String,
     pub sequence: i64,
+    // 0: primary_scheduling
+    // 1: secondary_scheduling
+    pub status: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -157,6 +160,7 @@ impl Manager {
         let block_info = block_info.unwrap();
         let block_hash = block_info.hash.to_string();
         let sequence = block_info.sequence;
+        let status = block_info.status;
         // we should have only one account in single task
         // all account in DResponse.data should be the same one
         if data.is_empty() {
@@ -168,6 +172,18 @@ impl Manager {
             match res {
                 Ok(res) => {
                     if res.data.updated {
+                        // update unstable table for primary scheduling task
+                        if status == 0 {
+                            let _ = self
+                                .shared
+                                .db_handler
+                                .add_primary_account(UnstableAccount {
+                                    address: address.clone(),
+                                    sequence,
+                                    hash: block_hash.clone(),
+                                })
+                                .await;
+                        }
                         let _ = self
                             .shared
                             .db_handler
@@ -197,6 +213,17 @@ impl Manager {
             match imported {
                 Ok(raw) => {
                     if raw.data.imported {
+                        if status == 0 {
+                            let _ = self
+                                .shared
+                                .db_handler
+                                .add_primary_account(UnstableAccount {
+                                    address: address.clone(),
+                                    sequence,
+                                    hash: block_hash.clone(),
+                                })
+                                .await;
+                        }
                         let _ = self
                             .shared
                             .db_handler
