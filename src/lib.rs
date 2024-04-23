@@ -69,14 +69,19 @@ pub async fn scheduling_tasks(
                 sequence: block_sequence,
             },
         );
+        let mut task_scheduled = false;
         for (_k, worker) in manager.workers.read().await.iter() {
             if worker.status == 1 {
                 if let Err(e) = worker.router.send(task.clone()).await {
                     error!("failed to send task to manager {}", e);
                 } else {
-                    return;
+                    task_scheduled = true;
+                    break;
                 }
             }
+        }
+        if task_scheduled {
+            continue;
         }
         let _ = manager.task_queue.write().await.push(task);
     }
