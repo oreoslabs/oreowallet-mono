@@ -4,6 +4,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use futures::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::{
     io::split,
     net::TcpStream,
@@ -25,15 +26,22 @@ use crate::{
 
 use self::codec::{DMessageCodec, DRequest, DResponse};
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ServerMessage {
+    pub name: String,
+    pub request: DRequest,
+}
+
 #[derive(Debug, Clone)]
 pub struct ServerWorker {
-    pub router: Sender<DRequest>,
+    pub router: Sender<ServerMessage>,
     // 1: Idle; 2: Busy
     pub status: u8,
 }
 
 impl ServerWorker {
-    pub fn new(router: Sender<DRequest>) -> Self {
+    pub fn new(router: Sender<ServerMessage>) -> Self {
         Self { router, status: 1 }
     }
 }
@@ -67,7 +75,7 @@ impl Manager {
     }
 
     pub async fn handle_stream(stream: TcpStream, server: Arc<Self>) -> Result<()> {
-        let (tx, mut rx) = mpsc::channel::<DRequest>(1024);
+        let (tx, mut rx) = mpsc::channel::<ServerMessage>(1024);
         let mut worker_name = stream.peer_addr().unwrap().clone().to_string();
         let (r, w) = split(stream);
         let mut outbound_w = FramedWrite::new(w, DMessageCodec::default());
@@ -77,7 +85,26 @@ impl Manager {
         let _ = timer.tick().await;
 
         let worker_server = server.clone();
-        tokio::spawn(async move {
+
+        let worker_server_clone = worker_server.clone();
+        let out_message_handler = tokio::spawn(async move {
+            while let Some(message) = rx.recv().await {
+                let ServerMessage { name, request } = message;
+                let _ = worker_server_clone
+                    .workers
+                    .write()
+                    .await
+                    .get_mut(&name)
+                    .unwrap()
+                    .status = 2;
+                let send_future = outbound_w.send(DMessage::DRequest(request));
+                if let Err(error) = timeout(Duration::from_millis(200), send_future).await {
+                    error!("send message to worker timeout: {}", error);
+                }
+            }
+        });
+
+        let in_message_handler = tokio::spawn(async move {
             let _ = router.send(());
             loop {
                 tokio::select! {
@@ -85,15 +112,6 @@ impl Manager {
                         debug!("no message from worker {} for 5 mins, exit", worker_name);
                         let _ = worker_server.workers.write().await.remove(&worker_name).unwrap();
                         break;
-                    },
-                    Some(request) = rx.recv() => {
-                        debug!("new message from rx for worker {}", worker_name);
-                        let _ = worker_server.workers.write().await.get_mut(&worker_name).unwrap().status = 2;
-                        let send_future = outbound_w.send(DMessage::DRequest(request));
-                        if let Err(error) = timeout(Duration::from_millis(200), send_future).await {
-                            debug!("send message to worker timeout: {}", error);
-                        }
-
                     },
                     result = outbound_r.next() => {
                         debug!("new message from outboud_reader {:?} of worker {}", result, worker_name);
@@ -106,29 +124,29 @@ impl Manager {
                                         match worker_name == register.name {
                                             true => {},
                                             false => {
-                                                let mut worker = ServerWorker::new(tx.clone());
+                                                let worker = ServerWorker::new(tx.clone());
                                                 worker_name = register.name;
                                                 info!("new worker: {}", worker_name.clone());
+                                                let _ = worker_server.workers.write().await.insert(worker_name.clone(), worker);
                                                 match worker_server.task_queue.write().await.pop() {
                                                     Some(task) => {
-                                                        let _ = tx.send(task).await.unwrap();
-                                                        worker.status = 2;
+                                                        let _ = tx.send(ServerMessage { name: worker_name.clone(), request: task }).await.unwrap();
                                                     },
                                                     None => {},
                                                 }
-                                                let _ = worker_server.workers.write().await.insert(worker_name.clone(), worker);
                                             }
                                         }
                                     },
                                     DMessage::DRequest(_) => error!("invalid message from worker, should never happen"),
                                     DMessage::DResponse(response) => {
-                                        let _ = worker_server.update_account(response).await;
+                                        debug!("new response from worker {}", response.id);
                                         match worker_server.task_queue.write().await.pop() {
                                             Some(task) => {
-                                                let _ = tx.send(task).await.unwrap();
+                                                let _ = tx.send(ServerMessage { name: worker_name.clone(), request: task }).await.unwrap();
                                             },
                                             None => worker_server.workers.write().await.get_mut(&worker_name).unwrap().status = 1,
                                         }
+                                        let _ = worker_server.update_account(response).await;
                                     },
                                 }
                             },
@@ -144,11 +162,14 @@ impl Manager {
             error!("worker {} main loop exit", worker_name);
         });
         let _ = handler.await;
+
+        let _ = tokio::join!(in_message_handler, out_message_handler);
         Ok(())
     }
 
     pub async fn update_account(&self, response: DResponse) -> Result<()> {
         let DResponse { id, data, address } = response;
+        debug!("update account {} with task {}", address, id);
         let account = address_to_name(&address);
         let mapping = self.task_mapping.read().await;
         let block_info = mapping.get(&id);
@@ -161,6 +182,7 @@ impl Manager {
         let block_hash = block_info.hash.to_string();
         let sequence = block_info.sequence;
         let status = block_info.status;
+        drop(mapping);
         // we should have only one account in single task
         // all account in DResponse.data should be the same one
         if data.is_empty() {
@@ -190,7 +212,7 @@ impl Manager {
                             .update_account_head(address.clone(), sequence, block_hash.clone())
                             .await;
                         let _ = self.task_mapping.write().await.remove(&id).unwrap();
-                        debug!("account head updated, {}", account);
+                        info!("account {} head updated to {}", account, sequence);
                     } else {
                         error!("failed to update account head in node");
                     }

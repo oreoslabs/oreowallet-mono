@@ -18,10 +18,13 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
-use crate::web_handlers::{
-    account_status_handler, account_transaction_handler, broadcast_transaction_handler,
-    create_transaction_handler, generate_proof_handler, get_balances_handler, get_ores_handler,
-    get_transactions_handler, import_vk_handler, latest_block_handler, remove_account_handler,
+use crate::{
+    manager::ServerMessage,
+    web_handlers::{
+        account_status_handler, account_transaction_handler, broadcast_transaction_handler,
+        create_transaction_handler, generate_proof_handler, get_balances_handler, get_ores_handler,
+        get_transactions_handler, import_vk_handler, latest_block_handler, remove_account_handler,
+    },
 };
 
 pub mod config;
@@ -77,9 +80,16 @@ pub async fn scheduling_tasks(
             },
         );
         let mut task_scheduled = false;
-        for (_k, worker) in manager.workers.read().await.iter() {
+        for (k, worker) in manager.workers.read().await.iter() {
             if worker.status == 1 {
-                if let Err(e) = worker.router.send(task.clone()).await {
+                if let Err(e) = worker
+                    .router
+                    .send(ServerMessage {
+                        name: k.to_string(),
+                        request: task.clone(),
+                    })
+                    .await
+                {
                     error!("failed to send task to manager {}", e);
                 } else {
                     task_scheduled = true;
@@ -112,7 +122,7 @@ pub async fn run_server(
         std::future::pending::<()>().await;
         return Ok(());
     }
-    
+
     let manager = Manager::new(shared_resource.clone());
     let listener = TcpListener::bind(&dlistener).await.unwrap();
 
@@ -162,7 +172,7 @@ pub async fn run_server(
             {
                 if accounts.len() == 0 {
                     info!("empty accounts to handle in primary_scheduling");
-                    sleep(Duration::from_secs(3)).await;
+                    sleep(Duration::from_secs(10)).await;
                     continue;
                 }
                 for seq in start_seq..end_seq {
@@ -358,7 +368,7 @@ pub async fn run_server(
                     }
                 }
             }
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::from_secs(60)).await;
         }
     });
     let _ = handler.await;
