@@ -99,8 +99,20 @@ pub async fn run_server(
     rpc_server: String,
     db_handler: PgHandler,
     dlistener: SocketAddr,
+    decryption: bool,
 ) -> Result<()> {
     let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server));
+    if !decryption {
+        let (router, handler) = oneshot::channel();
+        let _ = tokio::spawn(async move {
+            let _ = router.send(());
+            let _ = start_rest_service(listen, shared_resource.clone()).await;
+        });
+        let _ = handler.await;
+        std::future::pending::<()>().await;
+        return Ok(());
+    }
+    
     let manager = Manager::new(shared_resource.clone());
     let listener = TcpListener::bind(&dlistener).await.unwrap();
 
@@ -260,6 +272,7 @@ pub async fn run_server(
                     }
                 }
             }
+            sleep(Duration::from_secs(10)).await;
         }
     });
     let _ = handler.await;
@@ -345,6 +358,7 @@ pub async fn run_server(
                     }
                 }
             }
+            sleep(Duration::from_secs(10)).await;
         }
     });
     let _ = handler.await;

@@ -11,7 +11,7 @@ use ironfish_server::{
 #[derive(Parser, Debug, Clone)]
 pub struct Command {
     /// The ip:port server will listen on for restful api
-    #[clap(short, long, default_value = "0.0.0.0:10001")]
+    #[clap(long, default_value = "0.0.0.0:10001")]
     pub listen: SocketAddr,
     /// The ip:port server will listen on for dworker
     #[clap(long, default_value = "0.0.0.0:10002")]
@@ -25,6 +25,9 @@ pub struct Command {
     /// The Ironfish rpc node to connect to
     #[clap(short, long, default_value = "127.0.0.1:9092")]
     pub node: String,
+    /// Enable decryption scheduling
+    #[clap(long)]
+    pub decryption: bool,
 }
 
 #[tokio::main]
@@ -36,11 +39,12 @@ async fn main() -> Result<()> {
         config,
         verbosity,
         node,
+        decryption,
     } = args;
     initialize_logger(verbosity);
     handle_signals().await?;
     let db_config = DbConfig::load(config).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
-    run_server(listen.into(), node, db_handler, dlisten.into()).await?;
+    run_server(listen.into(), node, db_handler, dlisten.into(), decryption).await?;
     Ok(())
 }
