@@ -61,6 +61,28 @@ impl DRequest {
             data,
         }
     }
+
+    pub fn from_transactions(account: &Account, transactions: &Vec<RpcTransaction>) -> Self {
+        let data = transactions
+            .iter()
+            .map(|tx| {
+                tx.notes
+                    .iter()
+                    .map(|note| SingleRequest::new(&tx.hash, note))
+                    .collect::<Vec<SingleRequest>>()
+            })
+            .collect::<Vec<Vec<SingleRequest>>>()
+            .concat();
+        Self {
+            id: Uuid::new_v4().to_string(),
+            address: account.address.clone(),
+            incoming_view_key: account.in_vk.clone(),
+            outgoing_view_key: account.out_vk.clone(),
+            view_key: account.vk.clone(),
+            decrypt_for_spender: true,
+            data,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]

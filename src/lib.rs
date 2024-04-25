@@ -67,41 +67,34 @@ pub async fn scheduling_tasks(
         "scheduling task for account {} at sequence {}",
         account.name, block_sequence
     );
-    for tx in transactions.iter() {
-        let task = DRequest::new(account, tx);
-        let task_id = task.id.clone();
-        let _ = manager.task_mapping.write().await.insert(
-            task_id,
-            TaskInfo {
-                timestampt: Utc::now().timestamp(),
-                hash: block_hash.to_string(),
-                sequence: block_sequence,
-                status,
-            },
-        );
-        let mut task_scheduled = false;
-        for (k, worker) in manager.workers.read().await.iter() {
-            if worker.status == 1 {
-                if let Err(e) = worker
-                    .router
-                    .send(ServerMessage {
-                        name: k.to_string(),
-                        request: task.clone(),
-                    })
-                    .await
-                {
-                    error!("failed to send task to manager {}", e);
-                } else {
-                    task_scheduled = true;
-                    break;
-                }
+    let task = DRequest::from_transactions(account, transactions);
+    let task_id = task.id.clone();
+    let _ = manager.task_mapping.write().await.insert(
+        task_id,
+        TaskInfo {
+            timestampt: Utc::now().timestamp(),
+            hash: block_hash.to_string(),
+            sequence: block_sequence,
+            status,
+        },
+    );
+    for (k, worker) in manager.workers.read().await.iter() {
+        if worker.status == 1 {
+            if let Err(e) = worker
+                .router
+                .send(ServerMessage {
+                    name: k.to_string(),
+                    request: task.clone(),
+                })
+                .await
+            {
+                error!("failed to send task to manager {}", e);
+            } else {
+                return;
             }
         }
-        if task_scheduled {
-            continue;
-        }
-        let _ = manager.task_queue.write().await.push(task);
     }
+    let _ = manager.task_queue.write().await.push(task);
 }
 
 pub async fn run_server(
