@@ -29,7 +29,7 @@ use self::codec::{DMessageCodec, DRequest, DResponse};
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerMessage {
-    pub name: String,
+    pub name: Option<String>,
     pub request: DRequest,
 }
 
@@ -90,13 +90,18 @@ impl Manager {
         let out_message_handler = tokio::spawn(async move {
             while let Some(message) = rx.recv().await {
                 let ServerMessage { name, request } = message;
-                let _ = worker_server_clone
-                    .workers
-                    .write()
-                    .await
-                    .get_mut(&name)
-                    .unwrap()
-                    .status = 2;
+                match name {
+                    Some(name) => {
+                        let _ = worker_server_clone
+                            .workers
+                            .write()
+                            .await
+                            .get_mut(&name)
+                            .unwrap()
+                            .status = 2;
+                    }
+                    None => {}
+                }
                 let send_future = outbound_w.send(DMessage::DRequest(request));
                 if let Err(error) = timeout(Duration::from_millis(200), send_future).await {
                     error!("send message to worker timeout: {}", error);
@@ -130,7 +135,7 @@ impl Manager {
                                                 let _ = worker_server.workers.write().await.insert(worker_name.clone(), worker);
                                                 match worker_server.task_queue.write().await.pop() {
                                                     Some(task) => {
-                                                        let _ = tx.send(ServerMessage { name: worker_name.clone(), request: task }).await.unwrap();
+                                                        let _ = tx.send(ServerMessage { name: Some(worker_name.clone()), request: task }).await.unwrap();
                                                     },
                                                     None => {},
                                                 }
@@ -142,7 +147,7 @@ impl Manager {
                                         debug!("new response from worker {}", response.id);
                                         match worker_server.task_queue.write().await.pop() {
                                             Some(task) => {
-                                                let _ = tx.send(ServerMessage { name: worker_name.clone(), request: task }).await.unwrap();
+                                                let _ = tx.send(ServerMessage { name: None, request: task }).await.unwrap();
                                             },
                                             None => worker_server.workers.write().await.get_mut(&worker_name).unwrap().status = 1,
                                         }

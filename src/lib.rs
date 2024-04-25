@@ -83,7 +83,7 @@ pub async fn scheduling_tasks(
             if let Err(e) = worker
                 .router
                 .send(ServerMessage {
-                    name: k.to_string(),
+                    name: Some(k.to_string()),
                     request: task.clone(),
                 })
                 .await
