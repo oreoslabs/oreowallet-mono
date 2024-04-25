@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 use futures::{SinkExt, StreamExt};
@@ -38,10 +39,10 @@ pub async fn decrypt(worker_pool: Arc<ThreadPool>, request: DRequest) -> DRespon
     let in_vk = in_vk.unwrap();
     let out_vk = out_vk.unwrap();
     target_hash = worker_pool.install(move || {
-        let decrypted: Vec<Option<String>> = data
+        let decrypted: HashSet<Option<String>> = data
             .into_par_iter()
             .map(|data| {
-                let serialized_note = data.serialized_note.clone();
+                let serialized_note = data.serialized_note;
                 let tx_hash = data.tx_hash;
                 let raw = hex::decode(serialized_note);
                 match raw {
@@ -51,14 +52,14 @@ pub async fn decrypt(worker_pool: Arc<ThreadPool>, request: DRequest) -> DRespon
                             let note_enc = note_enc.unwrap();
                             if let Ok(received_note) = note_enc.decrypt_note_for_owner(&in_vk) {
                                 if received_note.value() != 0 {
-                                    return Some(tx_hash.clone());
+                                    return Some(tx_hash);
                                 }
                             }
 
                             if decrypt_for_spender {
                                 if let Ok(spend_note) = note_enc.decrypt_note_for_spender(&out_vk) {
                                     if spend_note.value() != 0 {
-                                        return Some(tx_hash.clone());
+                                        return Some(tx_hash);
                                     }
                                 }
                             }
