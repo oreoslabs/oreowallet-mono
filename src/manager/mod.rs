@@ -87,7 +87,7 @@ impl Manager {
         let worker_server = server.clone();
 
         let worker_server_clone = worker_server.clone();
-        let out_message_handler = tokio::spawn(async move {
+        let _out_message_handler = tokio::spawn(async move {
             while let Some(message) = rx.recv().await {
                 let ServerMessage { name, request } = message;
                 match name {
@@ -109,7 +109,7 @@ impl Manager {
             }
         });
 
-        let in_message_handler = tokio::spawn(async move {
+        let _in_message_handler = tokio::spawn(async move {
             let _ = router.send(());
             loop {
                 tokio::select! {
@@ -167,8 +167,6 @@ impl Manager {
             error!("worker {} main loop exit", worker_name);
         });
         let _ = handler.await;
-
-        let _ = tokio::join!(in_message_handler, out_message_handler);
         Ok(())
     }
 
