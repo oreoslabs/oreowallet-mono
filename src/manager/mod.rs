@@ -191,16 +191,16 @@ impl Manager {
         // we should have only one account in single task
         // all account in DResponse.data should be the same one
         if data.is_empty() {
-            let res = self
-                .shared
-                .rpc_handler
-                .update_head(account.clone(), block_hash.clone())
-                .await;
-            match res {
-                Ok(res) => {
-                    if res.data.updated {
-                        // update unstable table for primary scheduling task
-                        if status == 0 {
+            if status == 0 {
+                let res = self
+                    .shared
+                    .rpc_handler
+                    .update_head(account.clone(), block_hash.clone())
+                    .await;
+                match res {
+                    Ok(res) => {
+                        if res.data.updated {
+                            // update unstable table for primary scheduling task
                             let _ = self
                                 .shared
                                 .db_handler
@@ -210,20 +210,20 @@ impl Manager {
                                     hash: block_hash.clone(),
                                 })
                                 .await;
+                        } else {
+                            error!("failed to update account head in node");
                         }
-                        let _ = self
-                            .shared
-                            .db_handler
-                            .update_account_head(address.clone(), sequence, block_hash.clone())
-                            .await;
-                        let _ = self.task_mapping.write().await.remove(&id).unwrap();
-                        info!("account {} head updated to {}", account, sequence);
-                    } else {
-                        error!("failed to update account head in node");
                     }
+                    Err(e) => error!("failed to update account head, {:?}", e),
                 }
-                Err(e) => error!("failed to update account head, {:?}", e),
             }
+            let _ = self
+                .shared
+                .db_handler
+                .update_account_head(address.clone(), sequence, block_hash.clone())
+                .await;
+            let _ = self.task_mapping.write().await.remove(&id).unwrap();
+            info!("account {} head updated to {}", account, sequence);
             return Ok(());
         }
 
