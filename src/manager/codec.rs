@@ -15,7 +15,7 @@ pub struct RegisterWorker {
     pub name: String,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SingleRequest {
     pub serialized_note: String,
@@ -31,7 +31,7 @@ impl SingleRequest {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DRequest {
     pub id: String,

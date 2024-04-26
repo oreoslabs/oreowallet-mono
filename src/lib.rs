@@ -1,4 +1,9 @@
-use std::{cmp, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    cmp::{self, Reverse},
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::Result;
 use axum::{
@@ -94,7 +99,11 @@ pub async fn scheduling_tasks(
             }
         }
     }
-    let _ = manager.task_queue.write().await.push(task);
+    let _ = manager
+        .task_queue
+        .write()
+        .await
+        .push(task, Reverse(block_sequence));
 }
 
 pub async fn run_server(

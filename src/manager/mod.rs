@@ -1,9 +1,10 @@
 pub mod codec;
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{cmp::Reverse, collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use futures::{SinkExt, StreamExt};
+use priority_queue::PriorityQueue;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::split,
@@ -59,7 +60,7 @@ pub struct TaskInfo {
 #[derive(Debug, Clone)]
 pub struct Manager {
     pub workers: Arc<RwLock<HashMap<String, ServerWorker>>>,
-    pub task_queue: Arc<RwLock<Vec<DRequest>>>,
+    pub task_queue: Arc<RwLock<PriorityQueue<DRequest, Reverse<i64>>>>,
     pub task_mapping: Arc<RwLock<HashMap<String, TaskInfo>>>,
     pub shared: Arc<SharedState<PgHandler>>,
 }
@@ -68,7 +69,7 @@ impl Manager {
     pub fn new(shared: Arc<SharedState<PgHandler>>) -> Arc<Self> {
         Arc::new(Self {
             workers: Arc::new(RwLock::new(HashMap::new())),
-            task_queue: Arc::new(RwLock::new(vec![])),
+            task_queue: Arc::new(RwLock::new(PriorityQueue::new())),
             task_mapping: Arc::new(RwLock::new(HashMap::new())),
             shared,
         })
@@ -134,7 +135,7 @@ impl Manager {
                                                 info!("new worker: {}", worker_name.clone());
                                                 let _ = worker_server.workers.write().await.insert(worker_name.clone(), worker);
                                                 match worker_server.task_queue.write().await.pop() {
-                                                    Some(task) => {
+                                                    Some((task, _)) => {
                                                         let _ = tx.send(ServerMessage { name: Some(worker_name.clone()), request: task }).await.unwrap();
                                                     },
                                                     None => {},
@@ -146,7 +147,7 @@ impl Manager {
                                     DMessage::DResponse(response) => {
                                         debug!("new response from worker {}", response.id);
                                         match worker_server.task_queue.write().await.pop() {
-                                            Some(task) => {
+                                            Some((task, _)) => {
                                                 let _ = tx.send(ServerMessage { name: None, request: task }).await.unwrap();
                                             },
                                             None => worker_server.workers.write().await.get_mut(&worker_name).unwrap().status = 1,

@@ -50,6 +50,7 @@ uuid = { version = "1.8.0", features = [
 chrono = "0.4.37"
 num_cpus = "1.16.0"
 hex = "0.4.3"
+priority-queue = "2.0.2"
 
 [dev-dependencies]
 reqwest = { version = "0.11", default-features = false, features = [
