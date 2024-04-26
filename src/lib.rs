@@ -145,6 +145,11 @@ pub async fn run_server(
     let primary_scheduling_manager = manager.clone();
     let primary_handler = tokio::spawn(async move {
         let _ = router.send(());
+
+        // warmup, wait for dworkers
+        {
+            sleep(Duration::from_secs(30)).await;
+        }
         loop {
             let chain_head = primary_scheduling_manager
                 .shared
@@ -286,6 +291,11 @@ pub async fn run_server(
     let secondary_scheduling_manager = manager.clone();
     let secondary_handler = tokio::spawn(async move {
         let _ = router.send(());
+
+        // warmup, wait for dworkers
+        {
+            sleep(Duration::from_secs(30)).await;
+        }
         loop {
             if let Ok(accounts) = secondary_scheduling_manager
                 .shared
