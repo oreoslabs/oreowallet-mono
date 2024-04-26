@@ -1,5 +1,7 @@
+use std::str::FromStr;
+
 use futures::executor::block_on;
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgPool, Row};
 
 use crate::error::OreoError;
 
@@ -139,13 +141,11 @@ impl PgHandler {
 impl DBHandler for PgHandler {
     fn from_config(config: &crate::config::DbConfig) -> Self {
         let url = config.server_url();
-        let pool = block_on(async {
-            PgPoolOptions::default()
-                .max_connections(config.default_pool_size)
-                .connect(&url)
-                .await
-                .unwrap()
-        });
+        let options = PgConnectOptions::from_str(&url)
+            .unwrap()
+            .disable_statement_logging()
+            .clone();
+        let pool = block_on(async { PgPool::connect_with(options).await.unwrap() });
         Self::new(pool)
     }
 
