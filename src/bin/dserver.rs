@@ -2,20 +2,13 @@ use std::net::SocketAddr;
 
 use anyhow::Result;
 use clap::Parser;
-use ironfish_server::{
-    config::DbConfig,
-    db_handler::{DBHandler, PgHandler},
-    handle_signals, initialize_logger, run_server,
-};
+use ironfish_server::{handle_signals, initialize_logger, run_dserver};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Command {
     /// The ip:port server will listen on for restful api
     #[clap(long, default_value = "0.0.0.0:10001")]
-    pub listen: SocketAddr,
-    /// The path to db config file
-    #[clap(short, long)]
-    pub config: String,
+    pub dlisten: SocketAddr,
     /// Set your logger level
     #[clap(short, long, default_value = "0")]
     pub verbosity: u8,
@@ -28,15 +21,12 @@ pub struct Command {
 async fn main() -> Result<()> {
     let args = Command::parse();
     let Command {
-        listen,
-        config,
+        dlisten,
         verbosity,
         node,
     } = args;
     initialize_logger(verbosity);
     handle_signals().await?;
-    let db_config = DbConfig::load(config).unwrap();
-    let db_handler = PgHandler::from_config(&db_config);
-    run_server(listen.into(), node, db_handler).await?;
+    run_dserver(dlisten.into(), node).await?;
     Ok(())
 }

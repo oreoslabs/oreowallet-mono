@@ -1,9 +1,4 @@
-use std::{
-    cmp::{self, Reverse},
-    net::SocketAddr,
-    sync::Arc,
-    time::Duration,
-};
+use std::{cmp::Reverse, net::SocketAddr, sync::Arc, time::Duration};
 
 use anyhow::Result;
 use axum::{
@@ -13,11 +8,10 @@ use axum::{
     BoxError, Router,
 };
 use chrono::Utc;
-use constants::{REORG_DEPTH, SECONDARY_BATCH};
 use db_handler::{Account, DBHandler, PgHandler};
 use manager::{codec::DRequest, Manager, TaskInfo};
 use rpc_handler::{abi::RpcTransaction, RpcHandler};
-use tokio::{net::TcpListener, sync::oneshot, time::sleep};
+use tokio::{net::TcpListener, sync::oneshot};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info, warn};
@@ -110,315 +104,21 @@ pub async fn run_server(
     listen: SocketAddr,
     rpc_server: String,
     db_handler: PgHandler,
-    dlistener: SocketAddr,
-    decryption: bool,
 ) -> Result<()> {
     let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server));
-    if !decryption {
-        let (router, handler) = oneshot::channel();
-        let _ = tokio::spawn(async move {
-            let _ = router.send(());
-            let _ = start_rest_service(listen, shared_resource.clone()).await;
-        });
-        let _ = handler.await;
-        std::future::pending::<()>().await;
-        return Ok(());
-    }
 
-    let manager = Manager::new(shared_resource.clone());
-    let listener = TcpListener::bind(&dlistener).await.unwrap();
-
-    // dworker connection handler
     let (router, handler) = oneshot::channel();
-    let dworker_manager = manager.clone();
-    let dworker_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = router.send(());
-        loop {
-            match listener.accept().await {
-                Ok((stream, ip)) => {
-                    info!("new connection from {}", ip);
-                    if let Err(e) = Manager::handle_stream(stream, dworker_manager.clone()).await {
-                        error!("failed to handle stream, {e}");
-                    }
-                }
-                Err(e) => error!("failed to accept connection, {:?}", e),
-            }
-        }
+        let _ = start_rest_service(listen, shared_resource).await;
     });
     let _ = handler.await;
 
-    // primary loop
-    // scheduling decryption task for accounts whos head within [latest.block.sequence - REORG_DEPTH, latest.block.sequence]
-    // chain reorg should be handled during primary scanning carefully
-    let (router, handler) = oneshot::channel();
-    let primary_scheduling_manager = manager.clone();
-    let primary_handler = tokio::spawn(async move {
-        let _ = router.send(());
-
-        // warmup, wait for dworkers
-        {
-            sleep(Duration::from_secs(30)).await;
-        }
-        loop {
-            let chain_head = primary_scheduling_manager
-                .shared
-                .rpc_handler
-                .get_latest_block()
-                .await
-                .unwrap()
-                .data
-                .current_block_identifier;
-            let chain_height = chain_head.index.parse::<i64>().unwrap();
-            let start_seq = chain_height - REORG_DEPTH;
-            let end_seq = chain_height + 1;
-            if let Ok(accounts) = primary_scheduling_manager
-                .shared
-                .db_handler
-                .get_accounts_with_head(start_seq)
-                .await
-            {
-                if accounts.len() == 0 {
-                    info!("empty accounts to handle in primary_scheduling");
-                    sleep(Duration::from_secs(10)).await;
-                    continue;
-                }
-                for seq in start_seq..end_seq {
-                    let mut should_break = false;
-                    if let Ok(response) = primary_scheduling_manager
-                        .shared
-                        .rpc_handler
-                        .get_block(seq)
-                        .await
-                    {
-                        let current_block_hash = response.data.block.hash;
-                        let transactions = response.data.block.transactions;
-                        for acc in accounts.iter() {
-                            // Update account head/hash, createHead/hash for new created account
-                            if acc.head == seq
-                                && acc.create_head.is_some()
-                                && acc.create_head.unwrap() == seq
-                            {
-                                let _ = primary_scheduling_manager
-                                    .shared
-                                    .db_handler
-                                    .update_account_head(
-                                        acc.address.clone(),
-                                        seq,
-                                        current_block_hash.clone(),
-                                    )
-                                    .await;
-                                let _ = primary_scheduling_manager
-                                    .shared
-                                    .db_handler
-                                    .update_account_createdhead(
-                                        acc.address.clone(),
-                                        seq,
-                                        current_block_hash.clone(),
-                                    )
-                                    .await;
-                                continue;
-                            }
-
-                            // rollback to right onchain block for accounts on forked chain
-                            if acc.head == seq && acc.hash != current_block_hash.clone() {
-                                let mut sequence = seq;
-                                let mut hash = current_block_hash.clone();
-                                loop {
-                                    if acc.create_head.is_some()
-                                        && acc.create_head.unwrap() == sequence
-                                    {
-                                        let _ = primary_scheduling_manager
-                                            .shared
-                                            .db_handler
-                                            .update_account_createdhead(
-                                                acc.address.clone(),
-                                                sequence,
-                                                hash.clone(),
-                                            )
-                                            .await;
-                                        break;
-                                    }
-                                    if let Ok(unstable) = primary_scheduling_manager
-                                        .shared
-                                        .db_handler
-                                        .get_primary_account(acc.address.to_string(), sequence)
-                                        .await
-                                    {
-                                        if unstable.hash != hash.clone() {
-                                            let _ = primary_scheduling_manager
-                                                .shared
-                                                .db_handler
-                                                .del_primary_account(acc.address.clone(), sequence)
-                                                .await;
-                                            sequence -= 1;
-                                            hash = primary_scheduling_manager
-                                                .shared
-                                                .rpc_handler
-                                                .get_block(sequence)
-                                                .await
-                                                .unwrap()
-                                                .data
-                                                .block
-                                                .hash;
-                                        } else {
-                                            break;
-                                        }
-                                    }
-                                }
-                                let _ = primary_scheduling_manager
-                                    .shared
-                                    .db_handler
-                                    .update_account_head(acc.address.clone(), sequence, hash)
-                                    .await;
-                                should_break = true;
-                            } else {
-                                let _ = scheduling_tasks(
-                                    primary_scheduling_manager.clone(),
-                                    &acc,
-                                    &current_block_hash,
-                                    seq,
-                                    &transactions,
-                                    0,
-                                )
-                                .await;
-                            }
-                        }
-                        if should_break {
-                            break;
-                        }
-                    }
-                }
-            }
-            sleep(Duration::from_secs(10)).await;
-        }
-    });
-    let _ = handler.await;
-
-    // secondary loop
-    // scheduling decryption task for accounts whos head jump out [latest.block.sequence - REORG_DEPTH, latest.block.sequence]
-    let (router, handler) = oneshot::channel();
-    let secondary_scheduling_manager = manager.clone();
-    let secondary_handler = tokio::spawn(async move {
-        let _ = router.send(());
-
-        // warmup, wait for dworkers
-        {
-            sleep(Duration::from_secs(30)).await;
-        }
-        loop {
-            if let Ok(accounts) = secondary_scheduling_manager
-                .shared
-                .db_handler
-                .get_oldest_accounts()
-                .await
-            {
-                if accounts.len() == 0 {
-                    info!("empty accounts to handle in secondary_scheduling");
-                    sleep(Duration::from_secs(3)).await;
-                    continue;
-                }
-                let chain_head = secondary_scheduling_manager
-                    .shared
-                    .rpc_handler
-                    .get_latest_block()
-                    .await
-                    .unwrap()
-                    .data
-                    .current_block_identifier;
-                let account_head = accounts[0].head;
-                if account_head < chain_head.index.parse::<i64>().unwrap() - REORG_DEPTH {
-                    let start_seq = account_head;
-                    let end_seq = cmp::min(
-                        account_head + SECONDARY_BATCH,
-                        chain_head.index.parse::<i64>().unwrap() - REORG_DEPTH,
-                    );
-                    info!("start scanning from {} to {}", start_seq, end_seq);
-                    for seq in start_seq..end_seq {
-                        let mut should_break = false;
-                        if let Ok(response) = secondary_scheduling_manager
-                            .shared
-                            .rpc_handler
-                            .get_block(seq)
-                            .await
-                        {
-                            let previous_block_hash = response.data.block.previous_block_hash;
-                            let current_block_hash = response.data.block.hash;
-                            let transactions = response.data.block.transactions;
-                            for acc in accounts.iter() {
-                                // this should never happen in secondary_scheduling
-                                if acc.head == seq && acc.hash != current_block_hash.clone() {
-                                    warn!(
-                                        "block hash doesn't match, unexpected chain reorg happens at sequence {}", seq
-                                    );
-                                    warn!("should never happen in secondary_scheduling");
-                                    let _ = secondary_scheduling_manager
-                                        .shared
-                                        .db_handler
-                                        .update_account_head(
-                                            acc.address.clone(),
-                                            seq - 1,
-                                            previous_block_hash.clone(),
-                                        )
-                                        .await;
-                                    should_break = true;
-                                } else {
-                                    let _ = scheduling_tasks(
-                                        secondary_scheduling_manager.clone(),
-                                        &acc,
-                                        &current_block_hash,
-                                        seq,
-                                        &transactions,
-                                        1,
-                                    )
-                                    .await;
-                                }
-                            }
-                            if should_break {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            sleep(Duration::from_secs(10)).await;
-        }
-    });
-    let _ = handler.await;
-
-    // manager status updater
-    let status_manager = manager.clone();
-    let (router, handler) = oneshot::channel();
-    let status_update_handler = tokio::spawn(async move {
-        let _ = router.send(());
-        loop {
-            {
-                let workers = status_manager.workers.read().await;
-                let workers: Vec<&String> = workers.keys().collect();
-                let pending_taskes = status_manager.task_queue.read().await.len();
-                info!("online workers: {}, {:?}", workers.len(), workers);
-                info!("pending taskes in queue: {}", pending_taskes);
-            }
-            sleep(Duration::from_secs(10)).await;
-        }
-    });
-    let _ = handler.await;
-
-    // restful api handler
-    let (router, handler) = oneshot::channel();
-    let rest_handler = tokio::spawn(async move {
-        let _ = router.send(());
-        let _ = start_rest_service(listen, shared_resource.clone()).await;
-    });
-    let _ = handler.await;
-
-    let _ = tokio::join!(
-        dworker_handler,
-        rest_handler,
-        status_update_handler,
-        primary_handler,
-        secondary_handler
-    );
     std::future::pending::<()>().await;
+    Ok(())
+}
+
+pub async fn run_dserver(listen: SocketAddr, rpc_server: String) -> Result<()> {
     Ok(())
 }
 
