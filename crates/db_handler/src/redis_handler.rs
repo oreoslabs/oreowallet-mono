@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use substring::Substring;
 use tracing::info;
 
-use crate::{config::DbConfig, Account, DBHandler, UnstableAccount};
+use crate::{config::DbConfig, Account, DBHandler};
 
 pub const REDIS_ACCOUNT_KEY: &str = "IRONACCOUNT";
 pub const REDIS_ACCOUNT_KEY_V1: &str = "IRONACCOUNTV1";
@@ -127,95 +127,6 @@ impl DBHandler for RedisClient {
                 _ => Err(OreoError::DBError),
             },
         }
-    }
-
-    async fn update_account_head(
-        &self,
-        address: String,
-        new_head: i64,
-        new_hash: String,
-    ) -> Result<String, OreoError> {
-        if let Ok(mut acc) = self.get_account(address.clone()).await {
-            acc.head = new_head;
-            acc.hash = new_hash;
-            let str_account = serde_json::to_string(&acc).unwrap();
-            if let Err(_) = self.hset(&self.db_name, &address, &str_account).await {
-                return Err(OreoError::DBError);
-            }
-            Ok(acc.name.clone())
-        } else {
-            Err(OreoError::NoImported(address))
-        }
-    }
-
-    async fn get_oldest_accounts(&self) -> Result<Vec<Account>, OreoError> {
-        let all_accounts_map = self.hgetall(&self.db_name).await;
-        match all_accounts_map {
-            Ok(data) => {
-                let mut result = vec![];
-                let mut oldest_head = 1000000000;
-                for acc_str in data.values() {
-                    let acc = serde_json::from_str::<Account>(acc_str).unwrap();
-                    if acc.head < oldest_head {
-                        oldest_head = acc.head;
-                    }
-                }
-                for acc_str in data.values() {
-                    let acc = serde_json::from_str::<Account>(acc_str).unwrap();
-                    if acc.head <= oldest_head {
-                        result.push(acc);
-                    }
-                }
-                Ok(result)
-            }
-            Err(_) => Err(OreoError::DBError),
-        }
-    }
-
-    async fn get_accounts_with_head(&self, start_head: i64) -> Result<Vec<Account>, OreoError> {
-        let all_accounts_map = self.hgetall(&self.db_name).await;
-        match all_accounts_map {
-            Ok(data) => {
-                let mut result = vec![];
-                for acc_str in data.values() {
-                    let acc = serde_json::from_str::<Account>(acc_str).unwrap();
-                    if acc.head >= start_head {
-                        result.push(acc);
-                    }
-                }
-                Ok(result)
-            }
-            Err(_) => Err(OreoError::DBError),
-        }
-    }
-
-    async fn get_primary_account(
-        &self,
-        _address: String,
-        _sequence: i64,
-    ) -> Result<UnstableAccount, OreoError> {
-        unimplemented!("Redis is deprecated for such feature!")
-    }
-
-    async fn del_primary_account(
-        &self,
-        _address: String,
-        _sequence: i64,
-    ) -> Result<String, OreoError> {
-        unimplemented!("Redis is deprecated for such feature!")
-    }
-
-    async fn add_primary_account(&self, _account: UnstableAccount) -> Result<String, OreoError> {
-        unimplemented!("Redis is deprecated for such feature!")
-    }
-
-    async fn update_account_createdhead(
-        &self,
-        _address: String,
-        _new_head: i64,
-        _new_hash: String,
-    ) -> Result<String, OreoError> {
-        unimplemented!("Redis is deprecated for such feature!")
     }
 
     async fn update_scan_status(

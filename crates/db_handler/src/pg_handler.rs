@@ -4,7 +4,7 @@ use futures::executor::block_on;
 use oreo_errors::OreoError;
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgPool, Row};
 
-use super::{Account, DBHandler, UnstableAccount};
+use super::{Account, DBHandler};
 
 #[derive(Debug, Clone)]
 pub struct PgHandler {
@@ -28,18 +28,6 @@ impl PgHandler {
         .bind(account.in_vk.clone())
         .bind(account.out_vk.clone())
         .bind(account.vk.clone())
-        .bind(account.address.clone())
-        .fetch_one(&self.pool)
-        .await?.get(0);
-        Ok(result)
-    }
-
-    pub async fn insert_primary(&self, account: UnstableAccount) -> Result<String, sqlx::Error> {
-        let result = sqlx::query(
-            "INSERT INTO wallet.primarychain (sequence, hash, address) VALUES ($1, $2, $3) RETURNING address"
-        )
-        .bind(account.sequence)
-        .bind(account.hash.clone())
         .bind(account.address.clone())
         .fetch_one(&self.pool)
         .await?.get(0);
@@ -84,54 +72,6 @@ impl PgHandler {
             .fetch_one(&self.pool)
             .await?
             .get(0);
-        Ok(result)
-    }
-
-    pub async fn delete_primary(
-        &self,
-        address: String,
-        sequence: i64,
-    ) -> Result<String, sqlx::Error> {
-        let result = sqlx::query(
-            "DELETE FROM wallet.primarychain WHERE address = $1 AND sequence = $2 RETURNING address",
-        )
-        .bind(address)
-        .bind(sequence)
-        .fetch_one(&self.pool)
-        .await?
-        .get(0);
-        Ok(result)
-    }
-
-    pub async fn find_many_with_oldest_head(&self) -> Result<Vec<Account>, sqlx::Error> {
-        let result = sqlx::query_as(
-            "SELECT * FROM wallet.account WHERE head = (SELECT MIN(head) FROM wallet.account)",
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(result)
-    }
-
-    pub async fn find_many_with_head_filter(&self, head: i64) -> Result<Vec<Account>, sqlx::Error> {
-        let result = sqlx::query_as("SELECT * FROM wallet.account WHERE head >= $1")
-            .bind(head)
-            .fetch_all(&self.pool)
-            .await?;
-        Ok(result)
-    }
-
-    pub async fn get_one_from_primary(
-        &self,
-        address: String,
-        sequence: i64,
-    ) -> Result<UnstableAccount, sqlx::Error> {
-        let result = sqlx::query_as::<_, UnstableAccount>(
-            "SELECT * FROM wallet.primarychain WHERE address = $1 AND sequence = $2",
-        )
-        .bind(address)
-        .bind(sequence)
-        .fetch_one(&self.pool)
-        .await?;
         Ok(result)
     }
 
@@ -185,88 +125,6 @@ impl DBHandler for PgHandler {
             sqlx::Error::RowNotFound => OreoError::NoImported(address),
             _ => OreoError::DBError,
         })
-    }
-
-    async fn update_account_head(
-        &self,
-        address: String,
-        new_head: i64,
-        new_hash: String,
-    ) -> Result<String, OreoError> {
-        match self.get_one(address.clone()).await {
-            Ok(mut account) => {
-                account.head = new_head;
-                account.hash = new_hash;
-                self.update_one(account).await.map_err(|e| match e {
-                    sqlx::Error::RowNotFound => OreoError::NoImported(address),
-                    _ => OreoError::DBError,
-                })
-            }
-            Err(_) => Err(OreoError::NoImported(address)),
-        }
-    }
-
-    async fn get_oldest_accounts(&self) -> Result<Vec<Account>, OreoError> {
-        self.find_many_with_oldest_head()
-            .await
-            .map_err(|_| OreoError::DBError)
-    }
-
-    async fn get_accounts_with_head(&self, start_head: i64) -> Result<Vec<Account>, OreoError> {
-        self.find_many_with_head_filter(start_head)
-            .await
-            .map_err(|_| OreoError::DBError)
-    }
-
-    async fn get_primary_account(
-        &self,
-        address: String,
-        sequence: i64,
-    ) -> Result<UnstableAccount, OreoError> {
-        self.get_one_from_primary(address.clone(), sequence)
-            .await
-            .map_err(|e| match e {
-                sqlx::Error::RowNotFound => OreoError::NoImported(address),
-                _ => OreoError::DBError,
-            })
-    }
-
-    async fn del_primary_account(
-        &self,
-        address: String,
-        sequence: i64,
-    ) -> Result<String, OreoError> {
-        self.delete_primary(address.clone(), sequence)
-            .await
-            .map_err(|e| match e {
-                sqlx::Error::RowNotFound => OreoError::NoImported(address),
-                _ => OreoError::DBError,
-            })
-    }
-
-    async fn add_primary_account(&self, account: UnstableAccount) -> Result<String, OreoError> {
-        self.insert_primary(account)
-            .await
-            .map_err(|_| OreoError::DBError)
-    }
-
-    async fn update_account_createdhead(
-        &self,
-        address: String,
-        new_head: i64,
-        new_hash: String,
-    ) -> Result<String, OreoError> {
-        match self.get_one(address.clone()).await {
-            Ok(mut account) => {
-                account.create_head = Some(new_head);
-                account.create_hash = Some(new_hash);
-                self.update_one(account).await.map_err(|e| match e {
-                    sqlx::Error::RowNotFound => OreoError::NoImported(address),
-                    _ => OreoError::DBError,
-                })
-            }
-            Err(_) => Err(OreoError::NoImported(address)),
-        }
     }
 
     async fn update_scan_status(
