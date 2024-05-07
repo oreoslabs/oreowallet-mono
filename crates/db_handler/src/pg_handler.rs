@@ -134,6 +134,18 @@ impl PgHandler {
         .await?;
         Ok(result)
     }
+
+    pub async fn set_scan(&self, address: String, new_status: bool) -> Result<String, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE wallet.account SET need_scan = $1 WHERE address = $2 RETURNING name",
+        )
+        .bind(new_status)
+        .bind(address)
+        .fetch_one(&self.pool)
+        .await?
+        .get(0);
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -256,6 +268,23 @@ impl DBHandler for PgHandler {
             Err(_) => Err(OreoError::NoImported(address)),
         }
     }
+
+    async fn update_scan_status(
+        &self,
+        address: String,
+        new_status: bool,
+    ) -> Result<String, OreoError> {
+        match self.get_one(address.clone()).await {
+            Ok(account) => self
+                .set_scan(account.address, new_status)
+                .await
+                .map_err(|e| match e {
+                    sqlx::Error::RowNotFound => OreoError::NoImported(address),
+                    _ => OreoError::DBError,
+                }),
+            Err(_) => Err(OreoError::NoImported(address)),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -287,6 +316,7 @@ mod tests {
             out_vk: OUT_VK.to_string(),
             vk: VK.to_string(),
             address: ADDRESS.to_string(),
+            need_scan: false,
         }
     }
 

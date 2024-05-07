@@ -53,6 +53,12 @@ pub trait DBHandler {
         new_head: i64,
         new_hash: String,
     ) -> Result<String, OreoError>;
+    /// Update account need_scan status
+    async fn update_scan_status(
+        &self,
+        address: String,
+        new_status: bool,
+    ) -> Result<String, OreoError>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
@@ -67,6 +73,7 @@ pub struct Account {
     pub out_vk: String,
     pub vk: String,
     pub address: String,
+    pub need_scan: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]

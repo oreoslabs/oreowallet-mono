@@ -12,7 +12,7 @@ use networking::{
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
         RpcGetTransactionsRequest, RpcImportAccountRequest, RpcRemoveAccountRequest, RpcResponse,
     },
-    web_abi::{GetTransactionDetailResponse, ImportAccountRequest},
+    web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
 };
 use oreo_errors::OreoError;
 
@@ -101,6 +101,34 @@ pub async fn account_status_handler<T: DBHandler>(
         })
         .await
         .into_response()
+}
+
+pub async fn rescan_account_handler<T: DBHandler>(
+    State(shared): State<Arc<SharedState<T>>>,
+    extract::Json(account): extract::Json<RpcGetAccountStatusRequest>,
+) -> impl IntoResponse {
+    let db_account = shared.db_handler.get_account(account.account.clone()).await;
+    if let Err(e) = db_account {
+        return e.into_response();
+    }
+    let account = db_account.unwrap();
+
+    // todo: rpc handler
+    // 1. reset account
+    // 2. stop syncing
+    // 3. need_scan = true
+    // 4. start scanning with start_sequence = account_status.sequence, end_sequence = chain_header - reorg_depth
+    // 5. add decrypted transactions
+    // 6. start syncing
+    let _ = shared
+        .db_handler
+        .update_scan_status(account.address.clone(), true)
+        .await;
+    RpcResponse {
+        status: 200,
+        data: RescanAccountResponse { success: true },
+    }
+    .into_response()
 }
 
 pub async fn get_balances_handler<T: DBHandler>(

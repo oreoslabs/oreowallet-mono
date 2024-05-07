@@ -38,6 +38,7 @@ impl ImportAccountRequest {
             in_vk: self.incoming_view_key.clone(),
             out_vk: self.outgoing_view_key.clone(),
             vk: self.view_key.clone(),
+            need_scan: false,
         }
     }
 }
@@ -140,4 +141,9 @@ pub struct GenerateProofResponse {
     pub spend_proofs: Vec<Vec<u8>>,
     pub output_proofs: Vec<Vec<u8>>,
     pub mint_asset_proofs: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RescanAccountResponse {
+    pub success: bool,
 }

@@ -218,6 +218,14 @@ impl DBHandler for RedisClient {
         unimplemented!("Redis is deprecated for such feature!")
     }
 
+    async fn update_scan_status(
+        &self,
+        _address: String,
+        _new_status: bool,
+    ) -> Result<String, OreoError> {
+        unimplemented!("Redis is deprecated for such feature!")
+    }
+
     fn from_config(config: &DbConfig) -> Self {
         info!("Redis handler selected");
         RedisClient::connect(&config.server_url(), config.default_pool_size).unwrap()
@@ -265,6 +273,7 @@ mod tests {
             out_vk: OUT_VK.to_string(),
             vk: VK.to_string(),
             address: ADDRESS.to_string(),
+            need_scan: false,
         }
     }
 

@@ -17,7 +17,7 @@ use tracing::info;
 use crate::handlers::{
     account_status_handler, broadcast_transaction_handler, create_transaction_handler,
     get_balances_handler, get_ores_handler, get_transaction_handler, get_transactions_handler,
-    import_account_handler, latest_block_handler, remove_account_handler,
+    import_account_handler, latest_block_handler, remove_account_handler, rescan_account_handler,
 };
 
 mod handlers;
@@ -58,6 +58,7 @@ pub async fn run_server(
         .route("/accountStatus", post(account_status_handler))
         .route("/latestBlock", get(latest_block_handler))
         .route("/ores", post(get_ores_handler))
+        .route("/rescan", post(rescan_account_handler))
         .with_state(shared_resource.clone())
         .layer(
             ServiceBuilder::new()
