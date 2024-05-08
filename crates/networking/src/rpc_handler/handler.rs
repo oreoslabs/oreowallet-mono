@@ -37,7 +37,7 @@ impl RpcHandler {
         }
     }
 
-    pub async fn import_account(
+    pub fn import_account(
         &self,
         request: RpcImportAccountRequest,
     ) -> Result<RpcResponse<RpcImportAccountResponse>, OreoError> {
@@ -50,7 +50,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn export_account(
+    pub fn export_account(
         &self,
         account: String,
     ) -> Result<RpcResponse<RpcExportAccountResponse>, OreoError> {
@@ -63,7 +63,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn remove_account(
+    pub fn remove_account(
         &self,
         request: RpcRemoveAccountRequest,
     ) -> Result<RpcResponse<RpcRemoveAccountResponse>, OreoError> {
@@ -82,7 +82,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn get_account_status(
+    pub fn get_account_status(
         &self,
         request: RpcGetAccountStatusRequest,
     ) -> Result<RpcResponse<RpcGetAccountStatusResponse>, OreoError> {
@@ -91,7 +91,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn stop_syncing(
+    pub fn stop_syncing(
         &self,
         request: RpcGetAccountStatusRequest,
     ) -> Result<RpcResponse<RpcStopSyncingResponse>, OreoError> {
@@ -100,7 +100,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn start_syncing(
+    pub fn start_syncing(
         &self,
         request: RpcGetAccountStatusRequest,
     ) -> Result<RpcResponse<RpcStartSyncingResponse>, OreoError> {
@@ -109,7 +109,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn add_transaction(
+    pub fn add_transaction(
         &self,
         request: RpcAddTransactionRequest,
     ) -> Result<RpcResponse<RpcBroadcastTxResponse>, OreoError> {
@@ -118,7 +118,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn get_balances(
+    pub fn get_balances(
         &self,
         request: RpcGetBalancesRequest,
     ) -> Result<RpcResponse<RpcGetBalancesResponse>, OreoError> {
@@ -127,7 +127,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn get_account_transaction(
+    pub fn get_account_transaction(
         &self,
         request: RpcGetAccountTransactionRequest,
     ) -> Result<RpcResponse<RpcGetAccountTransactionResponse>, OreoError> {
@@ -136,7 +136,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn get_transactions(
+    pub fn get_transactions(
         &self,
         request: RpcGetTransactionsRequest,
     ) -> Result<RpcResponse<RpcGetTransactionsResponse>, OreoError> {
@@ -145,7 +145,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn create_transaction(
+    pub fn create_transaction(
         &self,
         request: RpcCreateTxRequest,
     ) -> Result<RpcResponse<RpcCreateTxResponse>, OreoError> {
@@ -154,7 +154,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn broadcast_transaction(
+    pub fn broadcast_transaction(
         &self,
         request: RpcBroadcastTxRequest,
     ) -> Result<RpcResponse<RpcBroadcastTxResponse>, OreoError> {
@@ -163,18 +163,13 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn get_latest_block(
-        &self,
-    ) -> Result<RpcResponse<RpcGetLatestBlockResponse>, OreoError> {
+    pub fn get_latest_block(&self) -> Result<RpcResponse<RpcGetLatestBlockResponse>, OreoError> {
         let path = format!("http://{}/chain/getChainInfo", self.endpoint);
         let resp = self.agent.clone().get(&path).call();
         handle_response(resp)
     }
 
-    pub async fn get_block(
-        &self,
-        sequence: i64,
-    ) -> Result<RpcResponse<RpcGetBlockResponse>, OreoError> {
+    pub fn get_block(&self, sequence: i64) -> Result<RpcResponse<RpcGetBlockResponse>, OreoError> {
         let path = format!("http://{}/chain/getBlock", self.endpoint);
         let resp = self
             .agent
@@ -187,7 +182,7 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub async fn get_blocks(
+    pub fn get_blocks(
         &self,
         start: u64,
         end: u64,
@@ -232,5 +227,18 @@ pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
     match res {
         Ok(data) => Ok(data),
         Err(e) => Err(OreoError::try_from(e).unwrap()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::RpcHandler;
+
+    #[test]
+    pub fn get_block_should_work() {
+        let rpc_handler = RpcHandler::new("127.0.0.1:8021".into());
+        let block = rpc_handler.get_latest_block().unwrap().data;
+        println!("{:?}", block);
     }
 }
