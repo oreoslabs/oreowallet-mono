@@ -86,6 +86,13 @@ impl PgHandler {
         .get(0);
         Ok(result)
     }
+
+    pub async fn get_many_need_scan(&self) -> Result<Vec<Account>, sqlx::Error> {
+        let result = sqlx::query_as("SELECT * FROM wallet.account WHERE need_scan = true")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -142,6 +149,12 @@ impl DBHandler for PgHandler {
                 }),
             Err(_) => Err(OreoError::NoImported(address)),
         }
+    }
+
+    async fn get_scan_accounts(&self) -> Result<Vec<Account>, OreoError> {
+        self.get_many_need_scan()
+            .await
+            .map_err(|_| OreoError::DBError)
     }
 }
 

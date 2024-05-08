@@ -27,6 +27,8 @@ pub trait DBHandler {
         address: String,
         new_status: bool,
     ) -> Result<String, OreoError>;
+    /// Get accounts list which needs scan
+    async fn get_scan_accounts(&self) -> Result<Vec<Account>, OreoError>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
