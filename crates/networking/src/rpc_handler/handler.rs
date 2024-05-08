@@ -8,12 +8,14 @@ use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::{
     rpc_abi::{
-        RpcBroadcastTxRequest, RpcBroadcastTxResponse, RpcCreateTxRequest, RpcCreateTxResponse,
-        RpcExportAccountResponse, RpcGetAccountStatusRequest, RpcGetAccountStatusResponse,
-        RpcGetAccountTransactionRequest, RpcGetAccountTransactionResponse, RpcGetBalancesRequest,
-        RpcGetBalancesResponse, RpcGetBlockRequest, RpcGetBlockResponse, RpcGetLatestBlockResponse,
-        RpcGetTransactionsRequest, RpcGetTransactionsResponse, RpcImportAccountRequest,
-        RpcImportAccountResponse, RpcRemoveAccountRequest, RpcRemoveAccountResponse, RpcResponse,
+        RpcAddTransactionRequest, RpcBroadcastTxRequest, RpcBroadcastTxResponse,
+        RpcCreateTxRequest, RpcCreateTxResponse, RpcExportAccountResponse,
+        RpcGetAccountStatusRequest, RpcGetAccountStatusResponse, RpcGetAccountTransactionRequest,
+        RpcGetAccountTransactionResponse, RpcGetBalancesRequest, RpcGetBalancesResponse,
+        RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest, RpcGetBlocksResponse,
+        RpcGetLatestBlockResponse, RpcGetTransactionsRequest, RpcGetTransactionsResponse,
+        RpcImportAccountRequest, RpcImportAccountResponse, RpcRemoveAccountRequest,
+        RpcRemoveAccountResponse, RpcResponse, RpcStartSyncingResponse, RpcStopSyncingResponse,
     },
     rpc_handler::RpcError,
 };
@@ -89,6 +91,33 @@ impl RpcHandler {
         handle_response(resp)
     }
 
+    pub async fn stop_syncing(
+        &self,
+        request: RpcGetAccountStatusRequest,
+    ) -> Result<RpcResponse<RpcStopSyncingResponse>, OreoError> {
+        let path = format!("http://{}/wallet/stopSyncing", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(&request);
+        handle_response(resp)
+    }
+
+    pub async fn start_syncing(
+        &self,
+        request: RpcGetAccountStatusRequest,
+    ) -> Result<RpcResponse<RpcStartSyncingResponse>, OreoError> {
+        let path = format!("http://{}/wallet/startSyncing", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(&request);
+        handle_response(resp)
+    }
+
+    pub async fn add_transaction(
+        &self,
+        request: RpcAddTransactionRequest,
+    ) -> Result<RpcResponse<RpcBroadcastTxResponse>, OreoError> {
+        let path = format!("http://{}/wallet/addTransaction", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(&request);
+        handle_response(resp)
+    }
+
     pub async fn get_balances(
         &self,
         request: RpcGetBalancesRequest,
@@ -155,6 +184,20 @@ impl RpcHandler {
                 sequence,
                 serialized: Some(true),
             });
+        handle_response(resp)
+    }
+
+    pub async fn get_blocks(
+        &self,
+        start: u64,
+        end: u64,
+    ) -> Result<RpcResponse<RpcGetBlocksResponse>, OreoError> {
+        let path = format!("http://{}/chain/getBlocks", self.endpoint);
+        let resp = self
+            .agent
+            .clone()
+            .post(&path)
+            .send_json(RpcGetBlocksRequest { start, end });
         handle_response(resp)
     }
 }

@@ -18,7 +18,7 @@ impl<T: Serialize> IntoResponse for RpcResponse<T> {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CreatedAt {
+pub struct BlockInfo {
     pub hash: String,
     pub sequence: u64,
 }
@@ -32,7 +32,7 @@ pub struct RpcImportAccountRequest {
     pub incoming_view_key: String,
     pub outgoing_view_key: String,
     pub public_address: String,
-    pub created_at: Option<CreatedAt>,
+    pub created_at: Option<BlockInfo>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -65,12 +65,27 @@ pub struct RpcGetAccountStatusRequest {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AccountStatus {
     pub name: String,
-    pub head: Option<CreatedAt>,
+    pub head: Option<BlockInfo>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RpcGetAccountStatusResponse {
     pub account: AccountStatus,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcStopSyncingResponse {}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcStartSyncingResponse {}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcAddTransactionRequest {
+    pub account: String,
+    pub transaction_hash: String,
+    pub start_block: BlockInfo,
+    pub end_block: BlockInfo,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -308,4 +323,15 @@ pub struct RpcBlock {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RpcGetBlockResponse {
     pub block: RpcBlock,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcGetBlocksRequest {
+    pub start: u64,
+    pub end: u64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcGetBlocksResponse {
+    pub blocks: Vec<RpcBlock>,
 }

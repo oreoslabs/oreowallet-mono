@@ -4,7 +4,7 @@ use oreo_errors::OreoError;
 use serde::{Deserialize, Serialize};
 
 use crate::rpc_abi::{
-    AssetBalanceDelta, CreatedAt, RpcGetAccountTransactionResponse, RpcNote, TransactionWithNotes,
+    AssetBalanceDelta, BlockInfo, RpcGetAccountTransactionResponse, RpcNote, TransactionWithNotes,
 };
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -14,7 +14,7 @@ pub struct ImportAccountRequest {
     pub incoming_view_key: String,
     pub outgoing_view_key: String,
     pub public_address: String,
-    pub created_at: Option<CreatedAt>,
+    pub created_at: Option<BlockInfo>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
