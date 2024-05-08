@@ -45,11 +45,7 @@ pub async fn import_account_handler<T: DBHandler>(
         name: account_name.unwrap(),
         created_at,
     };
-    shared
-        .rpc_handler
-        .import_account(rpc_data)
-        .await
-        .into_response()
+    shared.rpc_handler.import_account(rpc_data).into_response()
 }
 
 pub async fn remove_account_handler<T: DBHandler>(
@@ -63,14 +59,11 @@ pub async fn remove_account_handler<T: DBHandler>(
     if let Err(e) = db_account {
         return e.into_response();
     }
-    let result = shared
-        .rpc_handler
-        .remove_account(RpcRemoveAccountRequest {
-            account: db_account.unwrap().name,
-            confirm: Some(true),
-            wait: Some(true),
-        })
-        .await;
+    let result = shared.rpc_handler.remove_account(RpcRemoveAccountRequest {
+        account: db_account.unwrap().name,
+        confirm: Some(true),
+        wait: Some(true),
+    });
     match result {
         Ok(response) => {
             if let Err(e) = shared
@@ -99,7 +92,6 @@ pub async fn account_status_handler<T: DBHandler>(
         .get_account_status(RpcGetAccountStatusRequest {
             account: db_account.unwrap().name,
         })
-        .await
         .into_response()
 }
 
@@ -142,13 +134,10 @@ pub async fn get_balances_handler<T: DBHandler>(
     if let Err(e) = db_account {
         return e.into_response();
     }
-    let resp = shared
-        .rpc_handler
-        .get_balances(RpcGetBalancesRequest {
-            account: db_account.unwrap().name,
-            confirmations: Some(get_balance.confirmations.unwrap_or(10)),
-        })
-        .await;
+    let resp = shared.rpc_handler.get_balances(RpcGetBalancesRequest {
+        account: db_account.unwrap().name,
+        confirmations: Some(get_balance.confirmations.unwrap_or(10)),
+    });
     match resp {
         Ok(res) => {
             let response = RpcResponse {
@@ -172,13 +161,10 @@ pub async fn get_ores_handler<T: DBHandler>(
     if let Err(e) = db_account {
         return e.into_response();
     }
-    let resp = shared
-        .rpc_handler
-        .get_balances(RpcGetBalancesRequest {
-            account: db_account.unwrap().name,
-            confirmations: Some(get_balance.confirmations.unwrap_or(10)),
-        })
-        .await;
+    let resp = shared.rpc_handler.get_balances(RpcGetBalancesRequest {
+        account: db_account.unwrap().name,
+        confirmations: Some(get_balance.confirmations.unwrap_or(10)),
+    });
     match resp {
         Ok(res) => {
             let response = RpcResponse {
@@ -199,14 +185,14 @@ pub async fn get_transaction_handler<T: DBHandler>(
     if let Err(e) = db_account {
         return e.into_response();
     }
-    let rpc_transaction = shared
-        .rpc_handler
-        .get_account_transaction(RpcGetAccountTransactionRequest {
-            account: db_account.unwrap().name,
-            hash: account.hash,
-            notes: Some(true),
-        })
-        .await;
+    let rpc_transaction =
+        shared
+            .rpc_handler
+            .get_account_transaction(RpcGetAccountTransactionRequest {
+                account: db_account.unwrap().name,
+                hash: account.hash,
+                notes: Some(true),
+            });
     match rpc_transaction {
         Ok(RpcResponse { data, status: _ }) => {
             let transaction_detail = GetTransactionDetailResponse::from_rpc_data(data);
@@ -241,7 +227,6 @@ pub async fn get_transactions_handler<T: DBHandler>(
             limit: Some(get_transactions.limit.unwrap_or(6)),
             reverse: Some(true),
         })
-        .await
         .into_response()
 }
 
@@ -281,7 +266,6 @@ pub async fn create_transaction_handler<T: DBHandler>(
             mints: Some(mints),
             burns: Some(burns),
         })
-        .await
         .into_response()
 }
 
@@ -292,12 +276,11 @@ pub async fn broadcast_transaction_handler<T: DBHandler>(
     shared
         .rpc_handler
         .broadcast_transaction(broadcast_transaction)
-        .await
         .into_response()
 }
 
 pub async fn latest_block_handler<T: DBHandler>(
     State(shared): State<Arc<SharedState<T>>>,
 ) -> impl IntoResponse {
-    shared.rpc_handler.get_latest_block().await.into_response()
+    shared.rpc_handler.get_latest_block().into_response()
 }
