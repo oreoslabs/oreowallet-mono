@@ -1,9 +1,15 @@
-use std::{cmp::Reverse, collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    cmp::Reverse,
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use anyhow::Result;
 use db_handler::{DBHandler, PgHandler};
 use futures::{SinkExt, StreamExt};
 use networking::{
+    rpc_abi::BlockInfo,
     rpc_handler::RpcHandler,
     socket_message::codec::{DMessage, DMessageCodec, DRequest, DResponse},
 };
@@ -43,12 +49,28 @@ impl ServerWorker {
 
 #[derive(Debug, Clone)]
 pub struct TaskInfo {
-    pub timestampt: i64,
-    pub hash: String,
-    pub sequence: i64,
-    // 0: primary_scheduling
-    // 1: secondary_scheduling
-    pub status: u8,
+    pub since: Instant,
+    pub sequence: u32,
+    pub address: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountInfo {
+    pub start_block: BlockInfo,
+    pub end_block: BlockInfo,
+    pub remaining_task: u64,
+}
+
+impl AccountInfo {
+    pub fn new(start_block: BlockInfo, end_block: BlockInfo) -> Self {
+        let remaining_task = end_block.sequence - start_block.sequence + 1;
+        Self {
+            start_block,
+            end_block,
+            remaining_task,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,8 +94,9 @@ where
 #[derive(Debug, Clone)]
 pub struct Manager {
     pub workers: Arc<RwLock<HashMap<String, ServerWorker>>>,
-    pub task_queue: Arc<RwLock<PriorityQueue<DRequest, Reverse<i64>>>>,
+    pub task_queue: Arc<RwLock<PriorityQueue<DRequest, Reverse<u32>>>>,
     pub task_mapping: Arc<RwLock<HashMap<String, TaskInfo>>>,
+    pub account_mappling: Arc<RwLock<HashMap<String, AccountInfo>>>,
     pub shared: Arc<SharedState<PgHandler>>,
 }
 
@@ -83,6 +106,7 @@ impl Manager {
             workers: Arc::new(RwLock::new(HashMap::new())),
             task_queue: Arc::new(RwLock::new(PriorityQueue::new())),
             task_mapping: Arc::new(RwLock::new(HashMap::new())),
+            account_mappling: Arc::new(RwLock::new(HashMap::new())),
             shared,
         })
     }
