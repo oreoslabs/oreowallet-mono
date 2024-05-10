@@ -7,7 +7,7 @@ use std::{
 };
 
 use constants::REORG_DEPTH;
-use db_handler::{Account, PgHandler};
+use db_handler::{Account, DBHandler, PgHandler};
 use manager::{AccountInfo, Manager, ServerMessage, SharedState, TaskInfo};
 use networking::{
     rpc_abi::{BlockInfo, RpcBlock, RpcGetAccountStatusRequest},
@@ -87,7 +87,7 @@ pub async fn run_dserver(
     db_handler: PgHandler,
 ) -> anyhow::Result<()> {
     let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server));
-    let manager = Manager::new(shared_resource.clone());
+    let manager = Manager::new(shared_resource);
     let listener = TcpListener::bind(&dlisten).await.unwrap();
 
     // dworker handler
@@ -129,6 +129,7 @@ pub async fn run_dserver(
     });
     let _ = handler.await;
 
+    // primary task scheduling
     let schduler = manager.clone();
     let (router, handler) = oneshot::channel();
     let scheduling_handler =
@@ -198,7 +199,50 @@ pub async fn run_dserver(
         });
     let _ = handler.await;
 
-    let _ = tokio::join!(dworker_handler, status_update_handler, scheduling_handler);
+    // secondary task scheduling
+    let secondary = manager.clone();
+    let (router, handler) = oneshot::channel();
+    let secondary_scheduling_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        let read_map = secondary.task_mapping.read().await;
+        let task_to_reschdule: Vec<(&String, &TaskInfo)> = read_map
+            .iter()
+            .map(
+                |(task_id, task_info)| match task_info.since.elapsed().as_secs() > 300 {
+                    true => Some((task_id, task_info)),
+                    false => None,
+                },
+            )
+            .flatten()
+            .collect();
+        let mut write_map = secondary.task_mapping.write().await;
+        for (key, task_info) in task_to_reschdule {
+            let _ = write_map.remove(key).unwrap();
+            let address = task_info.address.to_string();
+            let sequence = task_info.sequence;
+            if let Ok(account) = secondary
+                .shared
+                .db_handler
+                .get_account(address.clone())
+                .await
+            {
+                if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence as i64) {
+                    let block = block.data.block;
+                    let _ = scheduling_tasks(secondary.clone(), &vec![account], vec![block])
+                        .await
+                        .unwrap();
+                }
+            }
+        }
+    });
+    let _ = handler.await;
+
+    let _ = tokio::join!(
+        dworker_handler,
+        status_update_handler,
+        scheduling_handler,
+        secondary_scheduling_handler
+    );
     std::future::pending::<()>().await;
     Ok(())
 }
