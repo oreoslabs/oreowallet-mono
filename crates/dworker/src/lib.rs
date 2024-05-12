@@ -23,7 +23,6 @@ pub async fn decrypt(worker_pool: Arc<ThreadPool>, request: DRequest) -> DRespon
         address,
         incoming_view_key,
         outgoing_view_key,
-        view_key: _,
         decrypt_for_spender,
         data,
     } = request;
@@ -49,8 +48,7 @@ pub async fn decrypt(worker_pool: Arc<ThreadPool>, request: DRequest) -> DRespon
                 match raw {
                     Ok(raw) => {
                         let note_enc = MerkleNote::read(&raw[..]);
-                        if note_enc.is_ok() {
-                            let note_enc = note_enc.unwrap();
+                        if let Ok(note_enc) = note_enc {
                             if let Ok(received_note) = note_enc.decrypt_note_for_owner(&in_vk) {
                                 if received_note.value() != 0 {
                                     return Some(tx_hash);

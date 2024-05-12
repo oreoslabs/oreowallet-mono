@@ -36,7 +36,6 @@ pub struct DRequest {
     pub address: String,
     pub incoming_view_key: String,
     pub outgoing_view_key: String,
-    pub view_key: String,
     pub decrypt_for_spender: bool,
     pub data: Vec<SingleRequest>,
 }
@@ -54,7 +53,6 @@ impl DRequest {
             address: account.address.clone(),
             incoming_view_key: account.in_vk.clone(),
             outgoing_view_key: account.out_vk.clone(),
-            view_key: account.vk.clone(),
             decrypt_for_spender: true,
             data,
         }
@@ -76,7 +74,6 @@ impl DRequest {
             address: account.address.clone(),
             incoming_view_key: account.in_vk.clone(),
             outgoing_view_key: account.out_vk.clone(),
-            view_key: account.vk.clone(),
             decrypt_for_spender: true,
             data,
         }
