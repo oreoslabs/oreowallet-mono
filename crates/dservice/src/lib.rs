@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use constants::REORG_DEPTH;
+use constants::{REORG_DEPTH, RESCHEDULING_DURATION};
 use db_handler::{Account, DBHandler, PgHandler};
 use manager::{AccountInfo, Manager, ServerMessage, SharedState, TaskInfo};
 use networking::{
@@ -195,6 +195,7 @@ pub async fn run_dserver(
                             .unwrap();
                     }
                 }
+                sleep(RESCHEDULING_DURATION).await;
             }
         });
     let _ = handler.await;
@@ -204,35 +205,39 @@ pub async fn run_dserver(
     let (router, handler) = oneshot::channel();
     let secondary_scheduling_handler = tokio::spawn(async move {
         let _ = router.send(());
-        let read_map = secondary.task_mapping.read().await;
-        let task_to_reschdule: Vec<(&String, &TaskInfo)> = read_map
-            .iter()
-            .map(
-                |(task_id, task_info)| match task_info.since.elapsed().as_secs() > 300 {
-                    true => Some((task_id, task_info)),
-                    false => None,
-                },
-            )
-            .flatten()
-            .collect();
-        let mut write_map = secondary.task_mapping.write().await;
-        for (key, task_info) in task_to_reschdule {
-            let _ = write_map.remove(key).unwrap();
-            let address = task_info.address.to_string();
-            let sequence = task_info.sequence;
-            if let Ok(account) = secondary
-                .shared
-                .db_handler
-                .get_account(address.clone())
-                .await
-            {
-                if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence as i64) {
-                    let block = block.data.block;
-                    let _ = scheduling_tasks(secondary.clone(), &vec![account], vec![block])
-                        .await
-                        .unwrap();
+        loop {
+            let read_map = secondary.task_mapping.read().await;
+            let task_to_reschdule: Vec<(&String, &TaskInfo)> = read_map
+                .iter()
+                .map(
+                    |(task_id, task_info)| match task_info.since.elapsed().as_secs() > 300 {
+                        true => Some((task_id, task_info)),
+                        false => None,
+                    },
+                )
+                .flatten()
+                .collect();
+            info!("secondary task scheduling: {:?}", task_to_reschdule);
+            let mut write_map = secondary.task_mapping.write().await;
+            for (key, task_info) in task_to_reschdule {
+                let _ = write_map.remove(key).unwrap();
+                let address = task_info.address.to_string();
+                let sequence = task_info.sequence;
+                if let Ok(account) = secondary
+                    .shared
+                    .db_handler
+                    .get_account(address.clone())
+                    .await
+                {
+                    if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence as i64) {
+                        let block = block.data.block;
+                        let _ = scheduling_tasks(secondary.clone(), &vec![account], vec![block])
+                            .await
+                            .unwrap();
+                    }
                 }
             }
+            sleep(RESCHEDULING_DURATION).await;
         }
     });
     let _ = handler.await;
