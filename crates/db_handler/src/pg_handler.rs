@@ -160,8 +160,10 @@ impl DBHandler for PgHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
-    use sqlx_db_tester::TestDb;
+    use sqlx_db_tester::TestPg;
 
     use crate::{address_to_name, Account, DBHandler};
 
@@ -172,8 +174,11 @@ mod tests {
     const OUT_VK: &str = "cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7";
     const ADDRESS: &str = "d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64";
 
-    fn get_tdb() -> TestDb {
-        TestDb::new("localhost", 5432, "postgres", "postgres", "./migrations")
+    fn get_tdb() -> TestPg {
+        TestPg::new(
+            "postgres://postgres:postgres@localhost:5432".to_string(),
+            Path::new("../../migrations"),
+        )
     }
 
     fn get_test_account() -> Account {
@@ -200,7 +205,7 @@ mod tests {
         let saved = pg_handler.save_account(account, 0).await;
         assert!(saved.is_ok());
         let saved = saved.unwrap();
-        assert_eq!(ADDRESS.to_string(), saved);
+        assert_eq!(address_to_name(&ADDRESS.to_string()), saved);
     }
 
     #[tokio::test]
@@ -209,8 +214,8 @@ mod tests {
         let pool = tdb.get_pool().await;
         let pg_handler = PgHandler::new(pool);
         let account = get_test_account();
-        let saved = pg_handler.save_account(account.clone(), 0).await.unwrap();
-        let saved = pg_handler.get_account(saved).await;
+        let _ = pg_handler.save_account(account.clone(), 0).await.unwrap();
+        let saved = pg_handler.get_account(ADDRESS.to_string()).await;
         assert!(saved.is_ok());
         let saved = saved.unwrap();
         assert_eq!(account, saved);
@@ -223,7 +228,7 @@ mod tests {
         let pg_handler = PgHandler::new(pool);
         let account = get_test_account();
         let saved = pg_handler.save_account(account.clone(), 0).await.unwrap();
-        let result = pg_handler.remove_account(saved.clone()).await;
+        let result = pg_handler.remove_account(ADDRESS.to_string()).await;
         assert!(result.is_ok());
 
         // run remove once again
