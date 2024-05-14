@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{
     extract::{self, State},
     response::IntoResponse,
+    Json,
 };
 use constants::ACCOUNT_VERSION;
 use db_handler::DBHandler;
@@ -15,6 +16,7 @@ use networking::{
     web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
 };
 use oreo_errors::OreoError;
+use serde_json::json;
 
 use crate::SharedState;
 
@@ -283,4 +285,8 @@ pub async fn latest_block_handler<T: DBHandler>(
     State(shared): State<Arc<SharedState<T>>>,
 ) -> impl IntoResponse {
     shared.rpc_handler.get_latest_block().into_response()
+}
+
+pub async fn health_check_handler() -> impl IntoResponse {
+    Json(json!({"code": 200, "data": "Hello prover!"})).into_response()
 }

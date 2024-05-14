@@ -123,3 +123,7 @@ pub async fn generate_proof_handler(
 
     Json(json!({"code": 200, "data": proof})).into_response()
 }
+
+pub async fn health_check_handler() -> impl IntoResponse {
+    Json(json!({"code": 200, "data": "Hello prover!"})).into_response()
+}

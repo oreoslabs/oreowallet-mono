@@ -1,18 +1,24 @@
 use std::{net::SocketAddr, time::Duration};
 
-use axum::{error_handling::HandleErrorLayer, http::StatusCode, routing::post, BoxError, Router};
+use axum::{
+    error_handling::HandleErrorLayer,
+    http::StatusCode,
+    routing::{get, post},
+    BoxError, Router,
+};
 use tokio::net::TcpListener;
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
-use crate::handlers::generate_proof_handler;
+use crate::handlers::{generate_proof_handler, health_check_handler};
 
 pub mod handlers;
 
 pub async fn run_prover(listen: SocketAddr) -> anyhow::Result<()> {
     let router = Router::new()
         .route("/generateProofs", post(generate_proof_handler))
+        .route("/healthCheck", get(health_check_handler))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|_: BoxError| async {

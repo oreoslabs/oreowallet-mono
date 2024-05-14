@@ -18,3 +18,4 @@ networking = { path = "../networking" }
 constants = { path = "../constants" }
 oreo_errors = { path = "../oreo_errors" }
 db_handler = { path = "../db_handler" }
+serde_json = "1.0.117"
