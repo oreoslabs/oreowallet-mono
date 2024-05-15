@@ -209,13 +209,7 @@ pub async fn run_dserver(
             let read_map = secondary.task_mapping.read().await;
             let task_to_reschdule: Vec<(&String, &TaskInfo)> = read_map
                 .iter()
-                .map(
-                    |(task_id, task_info)| match task_info.since.elapsed().as_secs() > 300 {
-                        true => Some((task_id, task_info)),
-                        false => None,
-                    },
-                )
-                .flatten()
+                .filter(|item| item.1.since.elapsed().as_secs() >= 300)
                 .collect();
             info!("secondary task scheduling: {:?}", task_to_reschdule);
             let mut write_map = secondary.task_mapping.write().await;
