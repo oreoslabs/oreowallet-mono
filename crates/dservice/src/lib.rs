@@ -36,46 +36,58 @@ pub async fn scheduling_tasks(
     blocks: Vec<RpcBlock>,
 ) -> anyhow::Result<()> {
     for account in accounts.iter() {
-        for block in blocks.iter() {
-            let task = DRequest::from_transactions(account, &block.transactions);
-            let task_id = task.id.clone();
-            let _ = scheduler.task_mapping.write().await.insert(
-                task_id,
-                TaskInfo {
-                    since: Instant::now(),
-                    sequence: block.sequence,
-                    address: account.address.clone(),
-                },
-            );
-            let mut task_sent = false;
-            for (k, worker) in scheduler.workers.read().await.iter() {
-                if worker.status == 1 {
-                    match worker
-                        .router
-                        .send(ServerMessage {
-                            name: Some(k.to_string()),
-                            request: task.clone(),
-                        })
-                        .await
-                    {
-                        Ok(_) => {
-                            task_sent = true;
-                            break;
-                        }
-                        Err(e) => {
-                            error!("failed to send message to worker, {:?}", e);
+        if let Some(account_info) = scheduler
+            .account_mappling
+            .read()
+            .await
+            .get(&account.address)
+        {
+            for block in blocks.iter() {
+                if block.sequence < account_info.start_block.sequence as u32
+                    || block.sequence > account_info.end_block.sequence as u32
+                {
+                    continue;
+                }
+                let task = DRequest::from_transactions(account, &block.transactions);
+                let task_id = task.id.clone();
+                let _ = scheduler.task_mapping.write().await.insert(
+                    task_id,
+                    TaskInfo {
+                        since: Instant::now(),
+                        sequence: block.sequence,
+                        address: account.address.clone(),
+                    },
+                );
+                let mut task_sent = false;
+                for (k, worker) in scheduler.workers.read().await.iter() {
+                    if worker.status == 1 {
+                        match worker
+                            .router
+                            .send(ServerMessage {
+                                name: Some(k.to_string()),
+                                request: task.clone(),
+                            })
+                            .await
+                        {
+                            Ok(_) => {
+                                task_sent = true;
+                                break;
+                            }
+                            Err(e) => {
+                                error!("failed to send message to worker, {:?}", e);
+                            }
                         }
                     }
                 }
+                if task_sent {
+                    continue;
+                }
+                let _ = scheduler
+                    .task_queue
+                    .write()
+                    .await
+                    .push(task, Reverse(block.sequence));
             }
-            if task_sent {
-                continue;
-            }
-            let _ = scheduler
-                .task_queue
-                .write()
-                .await
-                .push(task, Reverse(block.sequence));
         }
     }
     Ok(())
