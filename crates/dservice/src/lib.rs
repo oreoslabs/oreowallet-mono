@@ -55,6 +55,7 @@ pub async fn scheduling_tasks(
                     TaskInfo {
                         since: Instant::now(),
                         sequence: block.sequence,
+                        hash: block.hash.clone(),
                         address: account.address.clone(),
                     },
                 );

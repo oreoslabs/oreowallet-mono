@@ -9,7 +9,7 @@ use anyhow::Result;
 use db_handler::{address_to_name, DBHandler, PgHandler};
 use futures::{SinkExt, StreamExt};
 use networking::{
-    rpc_abi::{BlockInfo, RpcAddTransactionRequest},
+    rpc_abi::{BlockInfo, BlockWithHash, RpcSetAccountHeadRequest, TransactionWithHash},
     rpc_handler::RpcHandler,
     socket_message::codec::{DMessage, DMessageCodec, DRequest, DResponse},
 };
@@ -51,6 +51,7 @@ impl ServerWorker {
 pub struct TaskInfo {
     pub since: Instant,
     pub sequence: u32,
+    pub hash: String,
     pub address: String,
 }
 
@@ -60,6 +61,8 @@ pub struct AccountInfo {
     pub start_block: BlockInfo,
     pub end_block: BlockInfo,
     pub remaining_task: u64,
+    // mapping from block_hash to transaction list in this block
+    pub blocks: HashMap<String, Vec<TransactionWithHash>>,
 }
 
 impl AccountInfo {
@@ -69,6 +72,7 @@ impl AccountInfo {
             start_block,
             end_block,
             remaining_task,
+            blocks: HashMap::new(),
         }
     }
 }
@@ -210,31 +214,23 @@ impl Manager {
     pub async fn update_account(&self, response: DResponse) -> Result<()> {
         let address = response.address.clone();
         let task_id = response.id.clone();
-        if let Some(account_info) = self.account_mappling.read().await.get(&address) {
-            let _ = response
-                .data
-                .into_iter()
-                .map(|hash| {
-                    let add_transaction_request = RpcAddTransactionRequest {
-                        account: address_to_name(&address),
-                        transaction_hash: hash,
-                        start_block: account_info.start_block.clone(),
-                        end_block: account_info.end_block.clone(),
-                    };
-                    let _ = self
-                        .shared
-                        .rpc_handler
-                        .add_transaction(add_transaction_request);
-                    true
-                })
-                .collect::<Vec<bool>>();
-        }
         let mut should_clear_account = false;
         match self.account_mappling.write().await.get_mut(&address) {
             Some(account) => {
-                account.remaining_task -= 1;
-                if account.remaining_task == 0 {
-                    should_clear_account = true;
+                if let Some(task_info) = self.task_mapping.read().await.get(&task_id) {
+                    let block_hash = task_info.hash.to_string();
+                    account.blocks.insert(
+                        block_hash,
+                        response
+                            .data
+                            .into_iter()
+                            .map(|hash| TransactionWithHash { hash })
+                            .collect(),
+                    );
+                    account.remaining_task -= 1;
+                    if account.remaining_task == 0 {
+                        should_clear_account = true;
+                    }
                 }
             }
             None => {
@@ -242,6 +238,30 @@ impl Manager {
             }
         }
         if should_clear_account {
+            let account_info = self
+                .account_mappling
+                .read()
+                .await
+                .get(&address)
+                .unwrap()
+                .clone();
+            let set_account_head_request = RpcSetAccountHeadRequest {
+                account: address_to_name(&address),
+                start: account_info.start_block.hash.to_string(),
+                end: account_info.end_block.hash.to_string(),
+                blocks: account_info
+                    .blocks
+                    .iter()
+                    .map(|(k, v)| BlockWithHash {
+                        hash: k.to_string(),
+                        transactions: v.clone(),
+                    })
+                    .collect(),
+            };
+            let _ = self
+                .shared
+                .rpc_handler
+                .set_account_head(set_account_head_request);
             let _ = self.account_mappling.write().await.remove(&address);
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
