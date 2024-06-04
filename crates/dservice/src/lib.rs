@@ -24,7 +24,7 @@ pub fn blocks_range(blocks: Range<u64>, batch: u64) -> Vec<Range<u64>> {
     let mut result = vec![];
     for block in blocks.step_by(batch as usize) {
         let start = block;
-        let end = cmp::min(start + batch, end);
+        let end = cmp::min(start + batch - 1, end);
         result.push(start..end)
     }
     result
@@ -257,4 +257,15 @@ pub async fn run_dserver(
     );
     std::future::pending::<()>().await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::blocks_range;
+
+    #[test]
+    fn block_range_test() {
+        let range = blocks_range(1..100, 30);
+        println!("ranges, {:?}", range);
+    }
 }
