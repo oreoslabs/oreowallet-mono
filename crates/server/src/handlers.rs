@@ -11,7 +11,8 @@ use networking::{
     rpc_abi::{
         OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
-        RpcGetTransactionsRequest, RpcImportAccountRequest, RpcRemoveAccountRequest, RpcResponse,
+        RpcGetTransactionsRequest, RpcImportAccountRequest, RpcRemoveAccountRequest,
+        RpcResetAccountRequest, RpcResponse,
     },
     web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
 };
@@ -106,14 +107,11 @@ pub async fn rescan_account_handler<T: DBHandler>(
         return e.into_response();
     }
     let account = db_account.unwrap();
-
-    // todo: rpc handler
-    // 1. reset account
-    // 2. stop syncing
-    // 3. need_scan = true
-    // 4. start scanning with start_sequence = account_status.sequence, end_sequence = chain_header - reorg_depth
-    // 5. add decrypted transactions
-    // 6. start syncing
+    let _ = shared.rpc_handler.reset_account(RpcResetAccountRequest {
+        account: account.name.clone(),
+        reset_scanning_enabled: Some(false),
+        reset_created_at: Some(false),
+    });
     let _ = shared
         .db_handler
         .update_scan_status(account.address.clone(), true)

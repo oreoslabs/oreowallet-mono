@@ -232,7 +232,7 @@ pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
 
 #[cfg(test)]
 mod tests {
-    use crate::rpc_abi::RpcSetScanningRequest;
+    use crate::rpc_abi::{RpcResetAccountRequest, RpcSetScanningRequest};
 
     use super::RpcHandler;
 
@@ -249,6 +249,17 @@ mod tests {
         let result = rpc_handler.set_scanning(RpcSetScanningRequest {
             account: "test".to_string(),
             enabled: false,
+        });
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    pub fn reset_account_should_work() {
+        let rpc_handler = RpcHandler::new("127.0.0.1:8021".into());
+        let result = rpc_handler.reset_account(RpcResetAccountRequest {
+            account: "test".to_string(),
+            reset_created_at: Some(false),
+            reset_scanning_enabled: Some(false),
         });
         assert!(result.is_ok());
     }
