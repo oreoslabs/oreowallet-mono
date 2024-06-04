@@ -79,12 +79,12 @@ pub struct RpcSetScanningRequest {
     pub enabled: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TransactionWithHash {
     pub hash: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockWithHash {
     pub hash: String,
     pub transactions: Vec<TransactionWithHash>,
