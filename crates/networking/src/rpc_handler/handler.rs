@@ -8,14 +8,14 @@ use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::{
     rpc_abi::{
-        RpcAddTransactionRequest, RpcBroadcastTxRequest, RpcBroadcastTxResponse,
-        RpcCreateTxRequest, RpcCreateTxResponse, RpcExportAccountResponse,
-        RpcGetAccountStatusRequest, RpcGetAccountStatusResponse, RpcGetAccountTransactionRequest,
-        RpcGetAccountTransactionResponse, RpcGetBalancesRequest, RpcGetBalancesResponse,
-        RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest, RpcGetBlocksResponse,
-        RpcGetLatestBlockResponse, RpcGetTransactionsRequest, RpcGetTransactionsResponse,
-        RpcImportAccountRequest, RpcImportAccountResponse, RpcRemoveAccountRequest,
-        RpcRemoveAccountResponse, RpcResponse, RpcStartSyncingResponse, RpcStopSyncingResponse,
+        RpcBroadcastTxRequest, RpcBroadcastTxResponse, RpcCreateTxRequest, RpcCreateTxResponse,
+        RpcExportAccountResponse, RpcGetAccountStatusRequest, RpcGetAccountStatusResponse,
+        RpcGetAccountTransactionRequest, RpcGetAccountTransactionResponse, RpcGetBalancesRequest,
+        RpcGetBalancesResponse, RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest,
+        RpcGetBlocksResponse, RpcGetLatestBlockResponse, RpcGetTransactionsRequest,
+        RpcGetTransactionsResponse, RpcImportAccountRequest, RpcImportAccountResponse,
+        RpcRemoveAccountRequest, RpcRemoveAccountResponse, RpcResetAccountRequest, RpcResponse,
+        RpcSetAccountHeadRequest, RpcSetScanningRequest,
     },
     rpc_handler::RpcError,
 };
@@ -91,29 +91,29 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub fn stop_syncing(
+    pub fn set_scanning(
         &self,
-        request: RpcGetAccountStatusRequest,
-    ) -> Result<RpcResponse<RpcStopSyncingResponse>, OreoError> {
-        let path = format!("http://{}/wallet/stopSyncing", self.endpoint);
+        request: RpcSetScanningRequest,
+    ) -> Result<RpcResponse<Option<()>>, OreoError> {
+        let path = format!("http://{}/wallet/setScanning", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
         handle_response(resp)
     }
 
-    pub fn start_syncing(
+    pub fn set_account_head(
         &self,
-        request: RpcGetAccountStatusRequest,
-    ) -> Result<RpcResponse<RpcStartSyncingResponse>, OreoError> {
-        let path = format!("http://{}/wallet/startSyncing", self.endpoint);
+        request: RpcSetAccountHeadRequest,
+    ) -> Result<RpcResponse<Option<()>>, OreoError> {
+        let path = format!("http://{}/wallet/setAccountHead", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
         handle_response(resp)
     }
 
-    pub fn add_transaction(
+    pub fn reset_account(
         &self,
-        request: RpcAddTransactionRequest,
-    ) -> Result<RpcResponse<RpcBroadcastTxResponse>, OreoError> {
-        let path = format!("http://{}/wallet/addTransaction", self.endpoint);
+        request: RpcResetAccountRequest,
+    ) -> Result<RpcResponse<Option<()>>, OreoError> {
+        let path = format!("http://{}/wallet/resetAccount", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
         handle_response(resp)
     }
@@ -232,6 +232,7 @@ pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
 
 #[cfg(test)]
 mod tests {
+    use crate::rpc_abi::RpcSetScanningRequest;
 
     use super::RpcHandler;
 
@@ -240,5 +241,15 @@ mod tests {
         let rpc_handler = RpcHandler::new("127.0.0.1:8021".into());
         let block = rpc_handler.get_latest_block().unwrap().data;
         println!("{:?}", block);
+    }
+
+    #[test]
+    pub fn set_scanning_should_work() {
+        let rpc_handler = RpcHandler::new("127.0.0.1:8021".into());
+        let result = rpc_handler.set_scanning(RpcSetScanningRequest {
+            account: "test".to_string(),
+            enabled: false,
+        });
+        assert!(result.is_ok());
     }
 }

@@ -74,18 +74,36 @@ pub struct RpcGetAccountStatusResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct RpcStopSyncingResponse {}
+pub struct RpcSetScanningRequest {
+    pub account: String,
+    pub enabled: bool,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct RpcStartSyncingResponse {}
+pub struct TransactionWithHash {
+    pub hash: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BlockWithHash {
+    pub hash: String,
+    pub transactions: Vec<TransactionWithHash>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcSetAccountHeadRequest {
+    pub account: String,
+    pub start: String,
+    pub end: String,
+    pub blocks: Vec<BlockWithHash>,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RpcAddTransactionRequest {
+pub struct RpcResetAccountRequest {
     pub account: String,
-    pub transaction_hash: String,
-    pub start_block: BlockInfo,
-    pub end_block: BlockInfo,
+    pub reset_created_at: Option<bool>,
+    pub reset_scanning_enabled: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
