@@ -244,6 +244,13 @@ mod tests {
     }
 
     #[test]
+    pub fn get_blocks_should_work() {
+        let rpc_handler = RpcHandler::new("127.0.0.1:8021".into());
+        let blocks = rpc_handler.get_blocks(3, 12).unwrap().data;
+        println!("{:?}", blocks.blocks);
+    }
+
+    #[test]
     pub fn set_scanning_should_work() {
         let rpc_handler = RpcHandler::new("127.0.0.1:8021".into());
         let result = rpc_handler.set_scanning(RpcSetScanningRequest {

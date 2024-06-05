@@ -350,6 +350,11 @@ pub struct RpcGetBlocksRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct BlockItem {
+    pub block: RpcBlock,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RpcGetBlocksResponse {
-    pub blocks: Vec<RpcBlock>,
+    pub blocks: Vec<BlockItem>,
 }
