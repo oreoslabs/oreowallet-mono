@@ -107,6 +107,10 @@ pub async fn rescan_account_handler<T: DBHandler>(
         return e.into_response();
     }
     let account = db_account.unwrap();
+    let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
+        account: account.name.clone(),
+        enabled: false,
+    });
     let _ = shared.rpc_handler.reset_account(RpcResetAccountRequest {
         account: account.name.clone(),
         reset_scanning_enabled: Some(false),
