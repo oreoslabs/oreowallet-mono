@@ -8,7 +8,6 @@ use axum::{
     BoxError, Router,
 };
 use db_handler::{DBHandler, PgHandler};
-use handlers::update_scan_status_handler;
 use networking::rpc_handler::RpcHandler;
 use tokio::net::TcpListener;
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
@@ -19,7 +18,7 @@ use crate::handlers::{
     account_status_handler, broadcast_transaction_handler, create_transaction_handler,
     get_balances_handler, get_ores_handler, get_transaction_handler, get_transactions_handler,
     health_check_handler, import_account_handler, latest_block_handler, remove_account_handler,
-    rescan_account_handler,
+    rescan_account_handler, update_scan_status_handler,
 };
 
 mod handlers;
