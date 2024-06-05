@@ -12,7 +12,7 @@ use networking::{
         OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
         RpcGetTransactionsRequest, RpcImportAccountRequest, RpcRemoveAccountRequest,
-        RpcResetAccountRequest, RpcResponse,
+        RpcResetAccountRequest, RpcResponse, RpcSetScanningRequest,
     },
     web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
 };
@@ -115,6 +115,30 @@ pub async fn rescan_account_handler<T: DBHandler>(
     let _ = shared
         .db_handler
         .update_scan_status(account.address.clone(), true)
+        .await;
+    RpcResponse {
+        status: 200,
+        data: RescanAccountResponse { success: true },
+    }
+    .into_response()
+}
+
+pub async fn update_scan_status_handler<T: DBHandler>(
+    State(shared): State<Arc<SharedState<T>>>,
+    extract::Json(account): extract::Json<RpcGetAccountStatusRequest>,
+) -> impl IntoResponse {
+    let db_account = shared.db_handler.get_account(account.account.clone()).await;
+    if let Err(e) = db_account {
+        return e.into_response();
+    }
+    let account = db_account.unwrap();
+    let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
+        account: account.name.clone(),
+        enabled: true,
+    });
+    let _ = shared
+        .db_handler
+        .update_scan_status(account.address, false)
         .await;
     RpcResponse {
         status: 200,

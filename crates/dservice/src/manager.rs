@@ -9,7 +9,10 @@ use anyhow::Result;
 use db_handler::{address_to_name, DBHandler, PgHandler};
 use futures::{SinkExt, StreamExt};
 use networking::{
-    rpc_abi::{BlockInfo, BlockWithHash, RpcSetAccountHeadRequest, TransactionWithHash},
+    rpc_abi::{
+        BlockInfo, BlockWithHash, RpcGetAccountStatusRequest, RpcSetAccountHeadRequest,
+        TransactionWithHash,
+    },
     rpc_handler::RpcHandler,
     socket_message::codec::{DMessage, DMessageCodec, DRequest, DResponse},
 };
@@ -102,16 +105,18 @@ pub struct Manager {
     pub task_mapping: Arc<RwLock<HashMap<String, TaskInfo>>>,
     pub account_mappling: Arc<RwLock<HashMap<String, AccountInfo>>>,
     pub shared: Arc<SharedState<PgHandler>>,
+    pub server: String,
 }
 
 impl Manager {
-    pub fn new(shared: Arc<SharedState<PgHandler>>) -> Arc<Self> {
+    pub fn new(shared: Arc<SharedState<PgHandler>>, server: String) -> Arc<Self> {
         Arc::new(Self {
             workers: Arc::new(RwLock::new(HashMap::new())),
             task_queue: Arc::new(RwLock::new(PriorityQueue::new())),
             task_mapping: Arc::new(RwLock::new(HashMap::new())),
             account_mappling: Arc::new(RwLock::new(HashMap::new())),
             shared,
+            server,
         })
     }
 
@@ -263,6 +268,11 @@ impl Manager {
                 .rpc_handler
                 .set_account_head(set_account_head_request);
             let _ = self.account_mappling.write().await.remove(&address);
+            let _ = networking::ureq::post(&format!("http://{}", self.server)).send_json(
+                RpcGetAccountStatusRequest {
+                    account: address_to_name(&address),
+                },
+            );
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
         Ok(())

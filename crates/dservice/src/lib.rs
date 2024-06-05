@@ -98,9 +98,10 @@ pub async fn run_dserver(
     dlisten: SocketAddr,
     rpc_server: String,
     db_handler: PgHandler,
+    server: String,
 ) -> anyhow::Result<()> {
     let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server));
-    let manager = Manager::new(shared_resource);
+    let manager = Manager::new(shared_resource, server);
     let listener = TcpListener::bind(&dlisten).await.unwrap();
 
     // dworker handler

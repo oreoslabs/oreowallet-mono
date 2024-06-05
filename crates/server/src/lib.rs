@@ -8,6 +8,7 @@ use axum::{
     BoxError, Router,
 };
 use db_handler::{DBHandler, PgHandler};
+use handlers::update_scan_status_handler;
 use networking::rpc_handler::RpcHandler;
 use tokio::net::TcpListener;
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
@@ -61,6 +62,7 @@ pub async fn run_server(
         .route("/ores", post(get_ores_handler))
         .route("/rescan", post(rescan_account_handler))
         .route("/healthCheck", get(health_check_handler))
+        .route("/updateScan", post(update_scan_status_handler))
         .with_state(shared_resource.clone())
         .layer(
             ServiceBuilder::new()
