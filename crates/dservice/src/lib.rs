@@ -179,15 +179,10 @@ pub async fn run_dserver(
                         ) {
                             match status.data.account.head {
                                 Some(head) => {
-                                    let _ = schduler
-                                        .account_mappling
-                                        .write()
-                                        .await
-                                        .insert(
-                                            account.address.clone(),
-                                            AccountInfo::new(head.clone(), scan_end.clone()),
-                                        )
-                                        .unwrap();
+                                    let _ = schduler.account_mappling.write().await.insert(
+                                        account.address.clone(),
+                                        AccountInfo::new(head.clone(), scan_end.clone()),
+                                    );
                                     scan_start = cmp::min(scan_start, head.sequence);
                                     accounts_should_scan.push(account);
                                 }
@@ -195,6 +190,7 @@ pub async fn run_dserver(
                             }
                         }
                     }
+                    info!("accounts to scanning, {:?}", accounts_should_scan);
                     let blocks_to_scan = blocks_range(scan_start..scan_end.sequence + 1, 10);
                     for group in blocks_to_scan {
                         let blocks = schduler
@@ -204,9 +200,13 @@ pub async fn run_dserver(
                             .unwrap()
                             .data
                             .blocks;
-                        let _ = scheduling_tasks(schduler.clone(), &accounts_should_scan, blocks)
-                            .await
-                            .unwrap();
+                        let _ = scheduling_tasks(
+                            schduler.clone(),
+                            &accounts_should_scan,
+                            blocks.into_iter().map(|item| item.block).collect(),
+                        )
+                        .await
+                        .unwrap();
                     }
                 }
                 sleep(RESCHEDULING_DURATION).await;
