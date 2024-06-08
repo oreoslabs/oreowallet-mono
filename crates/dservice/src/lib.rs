@@ -178,6 +178,15 @@ pub async fn run_dserver(
                         hash: scan_end.hash,
                     };
                     for account in accounts {
+                        if schduler
+                            .account_mappling
+                            .read()
+                            .await
+                            .get(&account.address)
+                            .is_some()
+                        {
+                            continue;
+                        }
                         if let Ok(status) = schduler.shared.rpc_handler.get_account_status(
                             RpcGetAccountStatusRequest {
                                 account: account.name.clone(),
