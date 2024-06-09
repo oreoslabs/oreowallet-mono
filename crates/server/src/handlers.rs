@@ -5,11 +5,11 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use constants::ACCOUNT_VERSION;
+use constants::{ACCOUNT_VERSION, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
 use db_handler::DBHandler;
 use networking::{
     rpc_abi::{
-        OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
+        BlockInfo, OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
         RpcGetTransactionsRequest, RpcImportAccountRequest, RpcRemoveAccountRequest,
         RpcResetAccountRequest, RpcResponse, RpcSetScanningRequest,
@@ -90,12 +90,27 @@ pub async fn account_status_handler<T: DBHandler>(
     if let Err(e) = db_account {
         return e.into_response();
     }
-    shared
+    let result = shared
         .rpc_handler
         .get_account_status(RpcGetAccountStatusRequest {
             account: db_account.unwrap().name,
-        })
-        .into_response()
+        });
+    match result {
+        Ok(mut result) => {
+            match result.data.account.head {
+                Some(_) => {}
+                None => {
+                    result.data.account.head = Some(BlockInfo {
+                        hash: MAINNET_GENESIS_HASH.to_string(),
+                        sequence: MAINNET_GENESIS_SEQUENCE as u64,
+                    })
+                }
+            }
+            Ok(result)
+        }
+        Err(e) => Err(e),
+    }
+    .into_response()
 }
 
 pub async fn rescan_account_handler<T: DBHandler>(

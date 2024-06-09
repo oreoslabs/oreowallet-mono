@@ -6,7 +6,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use constants::{PRIMARY_BATCH, REORG_DEPTH, RESCHEDULING_DURATION};
+use constants::{
+    MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE, PRIMARY_BATCH, REORG_DEPTH,
+    RESCHEDULING_DURATION,
+};
 use db_handler::{Account, DBHandler, PgHandler};
 use manager::{AccountInfo, Manager, ServerMessage, SharedState, TaskInfo};
 use networking::{
@@ -201,7 +204,20 @@ pub async fn run_dserver(
                                     scan_start = cmp::min(scan_start, head.sequence);
                                     accounts_should_scan.push(account);
                                 }
-                                None => continue,
+                                None => {
+                                    let _ = schduler.account_mappling.write().await.insert(
+                                        account.address.clone(),
+                                        AccountInfo::new(
+                                            BlockInfo {
+                                                hash: MAINNET_GENESIS_HASH.to_string(),
+                                                sequence: MAINNET_GENESIS_SEQUENCE as u64,
+                                            },
+                                            scan_end.clone(),
+                                        ),
+                                    );
+                                    scan_start = cmp::min(scan_start, 1);
+                                    accounts_should_scan.push(account);
+                                }
                             }
                         }
                     }
