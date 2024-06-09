@@ -152,11 +152,11 @@ pub async fn run_dserver(
     // primary task scheduling
     let schduler = manager.clone();
     let (router, handler) = oneshot::channel();
-    let scheduling_handler =
-        tokio::spawn(async move {
-            let _ = router.send(());
-            loop {
-                if let Ok(accounts) = schduler.shared.db_handler.get_many_need_scan().await {
+    let scheduling_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        loop {
+            if let Ok(accounts) = schduler.shared.db_handler.get_many_need_scan().await {
+                if !accounts.is_empty() {
                     let mut accounts_should_scan = vec![];
                     let mut scan_start = u64::MAX;
                     let latest = schduler
@@ -225,9 +225,10 @@ pub async fn run_dserver(
                         .unwrap();
                     }
                 }
-                sleep(RESCHEDULING_DURATION).await;
             }
-        });
+            sleep(RESCHEDULING_DURATION).await;
+        }
+    });
     let _ = handler.await;
 
     // secondary task scheduling
