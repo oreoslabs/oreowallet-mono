@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use constants::{REORG_DEPTH, RESCHEDULING_DURATION};
+use constants::{PRIMARY_BATCH, REORG_DEPTH, RESCHEDULING_DURATION};
 use db_handler::{Account, DBHandler, PgHandler};
 use manager::{AccountInfo, Manager, ServerMessage, SharedState, TaskInfo};
 use networking::{
@@ -206,7 +206,8 @@ pub async fn run_dserver(
                         }
                     }
                     info!("accounts to scanning, {:?}", accounts_should_scan);
-                    let blocks_to_scan = blocks_range(scan_start..scan_end.sequence + 1, 10);
+                    let blocks_to_scan =
+                        blocks_range(scan_start..scan_end.sequence + 1, PRIMARY_BATCH);
                     for group in blocks_to_scan {
                         let blocks = schduler
                             .shared
