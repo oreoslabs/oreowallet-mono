@@ -144,7 +144,7 @@ pub async fn run_dserver(
                     status_manager.task_queue.read().await.len()
                 );
             }
-            sleep(Duration::from_secs(10)).await;
+            sleep(Duration::from_secs(60)).await;
         }
     });
     let _ = handler.await;
