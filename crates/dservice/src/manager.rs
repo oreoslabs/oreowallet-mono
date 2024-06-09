@@ -273,7 +273,7 @@ impl Manager {
             let _ = self.account_mappling.write().await.remove(&address);
             let _ = networking::ureq::post(&format!("http://{}/updateScan", self.server))
                 .send_json(RpcGetAccountStatusRequest {
-                    account: address_to_name(&address),
+                    account: address,
                 });
         }
         let _ = self.task_mapping.write().await.remove(&task_id);

@@ -11,4 +11,4 @@ pub const MAINNET_GENESIS_SEQUENCE: i64 = 1;
 pub const REORG_DEPTH: i64 = 100;
 pub const SECONDARY_BATCH: i64 = 10000;
 pub const RESCHEDULING_DURATION: Duration = Duration::from_secs(30);
-pub const PRIMARY_BATCH: u64 = 200;
+pub const PRIMARY_BATCH: u64 = 100;
