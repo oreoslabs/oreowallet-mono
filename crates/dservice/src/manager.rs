@@ -224,14 +224,16 @@ impl Manager {
             Some(account) => {
                 if let Some(task_info) = self.task_mapping.read().await.get(&task_id) {
                     let block_hash = task_info.hash.to_string();
-                    account.blocks.insert(
-                        block_hash,
-                        response
-                            .data
-                            .into_iter()
-                            .map(|hash| TransactionWithHash { hash })
-                            .collect(),
-                    );
+                    if !response.data.is_empty() {
+                        account.blocks.insert(
+                            block_hash,
+                            response
+                                .data
+                                .into_iter()
+                                .map(|hash| TransactionWithHash { hash })
+                                .collect(),
+                        );
+                    }
                     account.remaining_task -= 1;
                     if account.remaining_task == 0 {
                         should_clear_account = true;
@@ -243,6 +245,7 @@ impl Manager {
             }
         }
         if should_clear_account {
+            info!("account scaning completed, {}", address);
             let account_info = self
                 .account_mappling
                 .read()
