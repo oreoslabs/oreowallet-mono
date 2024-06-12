@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{cmp, ops::Range, time::Duration};
 
 use tokio::sync::oneshot;
 use tracing::{info, warn};
@@ -35,4 +35,15 @@ pub fn initialize_logger(verbosity: u8) {
             EnvFilter::from_default_env().add_directive("ironfish-server=info".parse().unwrap()),
         )
         .init();
+}
+
+pub fn blocks_range(blocks: Range<u64>, batch: u64) -> Vec<Range<u64>> {
+    let end = blocks.end;
+    let mut result = vec![];
+    for block in blocks.step_by(batch as usize) {
+        let start = block;
+        let end = cmp::min(start + batch - 1, end);
+        result.push(start..end)
+    }
+    result
 }

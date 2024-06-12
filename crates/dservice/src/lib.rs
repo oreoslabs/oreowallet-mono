@@ -1,7 +1,6 @@
 use std::{
     cmp::{self, Reverse},
     net::SocketAddr,
-    ops::Range,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -18,20 +17,10 @@ use networking::{
 };
 use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 use tracing::{debug, error, info};
+use utils::blocks_range;
 
 pub mod manager;
 pub mod router;
-
-pub fn blocks_range(blocks: Range<u64>, batch: u64) -> Vec<Range<u64>> {
-    let end = blocks.end;
-    let mut result = vec![];
-    for block in blocks.step_by(batch as usize) {
-        let start = block;
-        let end = cmp::min(start + batch - 1, end);
-        result.push(start..end)
-    }
-    result
-}
 
 pub async fn scheduling_tasks(
     scheduler: Arc<Manager>,
