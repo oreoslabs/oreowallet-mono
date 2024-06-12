@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use substring::Substring;
 use tracing::info;
 
-use crate::{config::DbConfig, Account, DBHandler};
+use crate::{config::DbConfig, Account, DBHandler, InnerBlock};
 
 pub const REDIS_ACCOUNT_KEY: &str = "IRONACCOUNT";
 pub const REDIS_ACCOUNT_KEY_V1: &str = "IRONACCOUNTV1";
@@ -138,6 +138,14 @@ impl DBHandler for RedisClient {
     }
 
     async fn get_scan_accounts(&self) -> Result<Vec<Account>, OreoError> {
+        unimplemented!("Redis is deprecated for such feature!")
+    }
+
+    async fn save_blocks(&self, _blocks: Vec<InnerBlock>) -> Result<(), OreoError> {
+        unimplemented!("Redis is deprecated for such feature!")
+    }
+
+    async fn get_blocks(&self, _start: i64, _end: i64) -> Result<Vec<InnerBlock>, OreoError> {
         unimplemented!("Redis is deprecated for such feature!")
     }
 

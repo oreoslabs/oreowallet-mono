@@ -4,6 +4,8 @@ use futures::executor::block_on;
 use oreo_errors::OreoError;
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgPool, Row};
 
+use crate::{DBBlock, DBTransaction, InnerBlock};
+
 use super::{Account, DBHandler};
 
 #[derive(Debug, Clone)]
@@ -93,6 +95,60 @@ impl PgHandler {
             .await?;
         Ok(result)
     }
+
+    pub async fn insert_compact_block(&self, block: DBBlock) -> Result<i64, sqlx::Error> {
+        let result = sqlx::query(
+            "INSERT INTO wallet.blocks (hash, sequence, transactions) VALUES ($1, $2, $3) RETURNING sequence"
+        )
+        .bind(block.hash.clone())
+        .bind(block.sequence)
+        .bind(block.transactions)
+        .fetch_one(&self.pool)
+        .await?.get(0);
+        Ok(result)
+    }
+
+    pub async fn insert_compact_transaction(
+        &self,
+        transaction: DBTransaction,
+    ) -> Result<String, sqlx::Error> {
+        let result = sqlx::query(
+            "INSERT INTO wallet.txs (hash, serialized_notes) VALUES ($1, $2) RETURNING hash",
+        )
+        .bind(transaction.hash.clone())
+        .bind(transaction.serialized_notes)
+        .fetch_one(&self.pool)
+        .await?
+        .get(0);
+        Ok(result)
+    }
+
+    // pub async fn get_compact_blockx(&self, sequence: i64) -> Result<InnerBlock, sqlx::Error> {
+    //     let result = sqlx::query_as("SELECT * FROM wallet.blocks ARRAY_AGG((txs.hash, txs.serialized_notes)) as transactions: Vec<DBTransaction> WHERE sequence = $1 JOIN txs ON txs.hash = ANY (wallet.blocks.transactions)")
+    //         .bind(sequence)
+    //         .fetch_one(&self.pool)
+    //         .await?;
+    //     Ok(result)
+    // }
+
+    pub async fn get_compact_block_header(&self, sequence: i64) -> Result<DBBlock, sqlx::Error> {
+        let result = sqlx::query_as("SELECT * FROM wallet.blocks WHERE sequence = $1")
+            .bind(sequence)
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(result)
+    }
+
+    pub async fn get_compact_transaction(
+        &self,
+        hash: String,
+    ) -> Result<DBTransaction, sqlx::Error> {
+        let result = sqlx::query_as("SELECT * FROM wallet.txs WHERE hash = $1")
+            .bind(hash)
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -156,6 +212,40 @@ impl DBHandler for PgHandler {
             .await
             .map_err(|_| OreoError::DBError)
     }
+
+    async fn save_blocks(&self, blocks: Vec<InnerBlock>) -> Result<(), OreoError> {
+        for block in blocks {
+            let transactions = block.transactions.clone();
+            let transaction = self.pool.begin().await.unwrap();
+            for tx in transactions {
+                let _ = self.insert_compact_transaction(tx).await.unwrap();
+            }
+            let _ = self
+                .insert_compact_block(DBBlock::new(block))
+                .await
+                .unwrap();
+            transaction.rollback().await.unwrap();
+        }
+        Ok(())
+    }
+
+    async fn get_blocks(&self, start: i64, end: i64) -> Result<Vec<InnerBlock>, OreoError> {
+        let mut blocks = vec![];
+        for sequence in start..end + 1 {
+            let block = self.get_compact_block_header(sequence).await.unwrap();
+            let mut transactions = vec![];
+            for hash in block.transactions.clone() {
+                let tx = self.get_compact_transaction(hash).await.unwrap();
+                transactions.push(tx);
+            }
+            blocks.push(InnerBlock {
+                hash: block.hash,
+                sequence: block.sequence,
+                transactions,
+            });
+        }
+        Ok(blocks)
+    }
 }
 
 #[cfg(test)]
@@ -165,7 +255,7 @@ mod tests {
     use constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
     use sqlx_db_tester::TestPg;
 
-    use crate::{address_to_name, Account, DBHandler};
+    use crate::{address_to_name, Account, DBHandler, DBTransaction, InnerBlock};
 
     use super::PgHandler;
 
@@ -193,6 +283,17 @@ mod tests {
             vk: VK.to_string(),
             address: ADDRESS.to_string(),
             need_scan: false,
+        }
+    }
+
+    fn get_test_block() -> InnerBlock {
+        InnerBlock {
+            hash: "dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0dae".to_string(),
+            sequence: 10,
+            transactions: vec![DBTransaction {
+                hash: "dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0dae".to_string(),
+                serialized_notes: vec!["dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0daedd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0dae".to_string()],
+            }],
         }
     }
 
@@ -234,5 +335,27 @@ mod tests {
         // run remove once again
         let should_error = pg_handler.remove_account(saved).await;
         assert!(should_error.is_err());
+    }
+
+    #[tokio::test]
+    async fn save_blocks_should_work_pg() {
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let pg_handler = PgHandler::new(pool);
+        let block = get_test_block();
+        let result = pg_handler.save_blocks(vec![block]).await;
+        println!("{:?}", result);
+    }
+
+    #[tokio::test]
+    async fn get_blocks_should_work_pg() {
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let pg_handler = PgHandler::new(pool);
+        let block = get_test_block();
+        let _ = pg_handler.save_blocks(vec![block]).await;
+
+        let blocks = pg_handler.get_blocks(10, 10).await.unwrap();
+        println!("{:?}", blocks);
     }
 }

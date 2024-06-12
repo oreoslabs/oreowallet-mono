@@ -29,6 +29,10 @@ pub trait DBHandler {
     ) -> Result<String, OreoError>;
     /// Get accounts list which needs scan
     async fn get_scan_accounts(&self) -> Result<Vec<Account>, OreoError>;
+    /// Save rpc blocks to db
+    async fn save_blocks(&self, blocks: Vec<InnerBlock>) -> Result<(), OreoError>;
+    /// Get compact blocks for dservice
+    async fn get_blocks(&self, start: i64, end: i64) -> Result<Vec<InnerBlock>, OreoError>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
@@ -48,4 +52,39 @@ pub struct Account {
 
 pub fn address_to_name(address: &str) -> String {
     address.substring(0, 10).into()
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow, sqlx::Type)]
+pub struct DBTransaction {
+    pub hash: String,
+    pub serialized_notes: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
+pub struct DBBlock {
+    pub hash: String,
+    pub sequence: i64,
+    pub transactions: Vec<String>,
+}
+
+impl DBBlock {
+    pub fn new(inner: InnerBlock) -> Self {
+        let InnerBlock {
+            hash,
+            sequence,
+            transactions,
+        } = inner;
+        Self {
+            hash,
+            sequence,
+            transactions: transactions.into_iter().map(|tx| tx.hash).collect(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, FromRow, Serialize, Deserialize)]
+pub struct InnerBlock {
+    pub hash: String,
+    pub sequence: i64,
+    pub transactions: Vec<DBTransaction>,
 }
