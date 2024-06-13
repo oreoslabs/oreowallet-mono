@@ -82,7 +82,7 @@ impl DBBlock {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, FromRow, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InnerBlock {
     pub hash: String,
     pub sequence: i64,

@@ -123,14 +123,6 @@ impl PgHandler {
         Ok(result)
     }
 
-    // pub async fn get_compact_blockx(&self, sequence: i64) -> Result<InnerBlock, sqlx::Error> {
-    //     let result = sqlx::query_as("SELECT * FROM wallet.blocks ARRAY_AGG((txs.hash, txs.serialized_notes)) as transactions: Vec<DBTransaction> WHERE sequence = $1 JOIN txs ON txs.hash = ANY (wallet.blocks.transactions)")
-    //         .bind(sequence)
-    //         .fetch_one(&self.pool)
-    //         .await?;
-    //     Ok(result)
-    // }
-
     pub async fn get_compact_block_header(&self, sequence: i64) -> Result<DBBlock, sqlx::Error> {
         let result = sqlx::query_as("SELECT * FROM wallet.blocks WHERE sequence = $1")
             .bind(sequence)
@@ -139,14 +131,15 @@ impl PgHandler {
         Ok(result)
     }
 
-    pub async fn get_compact_transaction(
+    pub async fn get_compact_transactions(
         &self,
-        hash: String,
-    ) -> Result<DBTransaction, sqlx::Error> {
-        let result = sqlx::query_as("SELECT * FROM wallet.txs WHERE hash = $1")
-            .bind(hash)
-            .fetch_one(&self.pool)
-            .await?;
+        txs: Vec<String>,
+    ) -> Result<Vec<DBTransaction>, sqlx::Error> {
+        let result =
+            sqlx::query_as("SELECT * FROM wallet.txs WHERE hash IN (SELECT * FROM UNNEST($1))")
+                .bind(txs)
+                .fetch_all(&self.pool)
+                .await?;
         Ok(result)
     }
 }
@@ -233,11 +226,10 @@ impl DBHandler for PgHandler {
         let mut blocks = vec![];
         for sequence in start..end + 1 {
             let block = self.get_compact_block_header(sequence).await.unwrap();
-            let mut transactions = vec![];
-            for hash in block.transactions.clone() {
-                let tx = self.get_compact_transaction(hash).await.unwrap();
-                transactions.push(tx);
-            }
+            let transactions = self
+                .get_compact_transactions(block.transactions.clone())
+                .await;
+            let transactions = transactions.unwrap();
             blocks.push(InnerBlock {
                 hash: block.hash,
                 sequence: block.sequence,
@@ -291,8 +283,11 @@ mod tests {
             hash: "dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0dae".to_string(),
             sequence: 10,
             transactions: vec![DBTransaction {
-                hash: "dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0dae".to_string(),
-                serialized_notes: vec!["dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0daedd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0dae".to_string()],
+                hash: "dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0da1".to_string(),
+                serialized_notes: vec!["dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0daedd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0dae1".to_string()],
+            }, DBTransaction {
+                hash: "dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0d2".to_string(),
+                serialized_notes: vec!["dd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0daedd6653ad5ec58e6174586d8a54e6c60731520d0c3b41c2e3266a05965cad0dae2".to_string()],
             }],
         }
     }
