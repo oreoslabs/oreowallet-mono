@@ -211,12 +211,9 @@ impl DBHandler for PgHandler {
             let transactions = block.transactions.clone();
             let transaction = self.pool.begin().await.unwrap();
             for tx in transactions {
-                let _ = self.insert_compact_transaction(tx).await.unwrap();
+                let _ = self.insert_compact_transaction(tx).await;
             }
-            let _ = self
-                .insert_compact_block(DBBlock::new(block))
-                .await
-                .unwrap();
+            let _ = self.insert_compact_block(DBBlock::new(block)).await;
             transaction.rollback().await.unwrap();
         }
         Ok(())
