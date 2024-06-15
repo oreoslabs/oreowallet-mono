@@ -225,7 +225,10 @@ impl DBHandler for PgHandler {
     async fn get_blocks(&self, start: i64, end: i64) -> Result<Vec<InnerBlock>, OreoError> {
         let mut blocks = vec![];
         for sequence in start..end + 1 {
-            let block = self.get_compact_block_header(sequence).await.unwrap();
+            let block = self
+                .get_compact_block_header(sequence)
+                .await
+                .map_err(|_| OreoError::DBError)?;
             let transactions = self
                 .get_compact_transactions(block.transactions.clone())
                 .await;
