@@ -4,7 +4,7 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use futures::{SinkExt, StreamExt};
 use ironfish_rust::{IncomingViewKey, MerkleNote, OutgoingViewKey};
 use networking::socket_message::codec::{
-    DMessage, DMessageCodec, DRequest, DResponse, RegisterWorker,
+    DMessage, DMessageCodec, DRequest, DResponse, RegisterWorker, SingleRequest,
 };
 use rayon::prelude::*;
 use rayon::{iter::IntoParallelIterator, ThreadPool};
@@ -42,29 +42,35 @@ pub async fn decrypt(worker_pool: Arc<ThreadPool>, request: DRequest) -> DRespon
         let decrypted: HashSet<Option<String>> = data
             .into_par_iter()
             .map(|data| {
-                let serialized_note = data.serialized_note;
-                let tx_hash = data.tx_hash;
-                let raw = hex::decode(serialized_note);
-                match raw {
-                    Ok(raw) => {
-                        let note_enc = MerkleNote::read(&raw[..]);
-                        if let Ok(note_enc) = note_enc {
-                            if let Ok(received_note) = note_enc.decrypt_note_for_owner(&in_vk) {
-                                if received_note.value() != 0 {
-                                    return Some(tx_hash);
-                                }
-                            }
-
-                            if decrypt_for_spender {
-                                if let Ok(spend_note) = note_enc.decrypt_note_for_spender(&out_vk) {
-                                    if spend_note.value() != 0 {
+                let SingleRequest {
+                    serialized_note,
+                    tx_hash,
+                } = data;
+                for note in serialized_note {
+                    let raw = hex::decode(note);
+                    match raw {
+                        Ok(raw) => {
+                            let note_enc = MerkleNote::read(&raw[..]);
+                            if let Ok(note_enc) = note_enc {
+                                if let Ok(received_note) = note_enc.decrypt_note_for_owner(&in_vk) {
+                                    if received_note.value() != 0 {
                                         return Some(tx_hash);
+                                    }
+                                }
+
+                                if decrypt_for_spender {
+                                    if let Ok(spend_note) =
+                                        note_enc.decrypt_note_for_spender(&out_vk)
+                                    {
+                                        if spend_note.value() != 0 {
+                                            return Some(tx_hash);
+                                        }
                                     }
                                 }
                             }
                         }
+                        Err(_) => {}
                     }
-                    Err(_) => {}
                 }
                 return None;
             })

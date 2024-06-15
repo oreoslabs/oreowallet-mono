@@ -6,13 +6,13 @@ use std::{
 };
 
 use constants::{
-    MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE, PRIMARY_BATCH, REORG_DEPTH,
-    RESCHEDULING_DURATION,
+    LOCAL_BLOCKS_CHECKPOINT, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE, PRIMARY_BATCH,
+    REORG_DEPTH, RESCHEDULING_DURATION,
 };
-use db_handler::{Account, DBHandler, PgHandler};
+use db_handler::{Account, DBHandler, InnerBlock, PgHandler};
 use manager::{AccountInfo, Manager, ServerMessage, SharedState, TaskInfo};
 use networking::{
-    rpc_abi::{BlockInfo, RpcBlock, RpcGetAccountStatusRequest},
+    rpc_abi::{BlockInfo, RpcGetAccountStatusRequest},
     socket_message::codec::DRequest,
 };
 use tokio::{net::TcpListener, sync::oneshot, time::sleep};
@@ -25,7 +25,7 @@ pub mod router;
 pub async fn scheduling_tasks(
     scheduler: Arc<Manager>,
     accounts: &Vec<Account>,
-    blocks: Vec<RpcBlock>,
+    blocks: Vec<InnerBlock>,
 ) -> anyhow::Result<()> {
     for account in accounts.iter() {
         if let Some(account_info) = scheduler
@@ -40,13 +40,13 @@ pub async fn scheduling_tasks(
                 account.address.clone()
             );
             for block in blocks.iter() {
-                if block.sequence < account_info.start_block.sequence as u32
-                    || block.sequence > account_info.end_block.sequence as u32
+                if (block.sequence as u64) < account_info.start_block.sequence
+                    || (block.sequence as u64) > account_info.end_block.sequence
                 {
                     debug!("skip height {:?}", block.sequence);
                     continue;
                 }
-                let task = DRequest::from_transactions(account, &block.transactions);
+                let task = DRequest::from_transactions(account, block.transactions.clone());
                 let task_id = task.id.clone();
                 let _ = scheduler.task_mapping.write().await.insert(
                     task_id,
@@ -214,20 +214,31 @@ pub async fn run_dserver(
                     let blocks_to_scan =
                         blocks_range(scan_start..scan_end.sequence + 1, PRIMARY_BATCH);
                     for group in blocks_to_scan {
-                        let blocks = schduler
-                            .shared
-                            .rpc_handler
-                            .get_blocks(group.start, group.end)
-                            .unwrap()
-                            .data
-                            .blocks;
-                        let _ = scheduling_tasks(
-                            schduler.clone(),
-                            &accounts_should_scan,
-                            blocks.into_iter().map(|item| item.block).collect(),
-                        )
-                        .await
-                        .unwrap();
+                        let blocks = match group.end <= LOCAL_BLOCKS_CHECKPOINT {
+                            true => schduler
+                                .shared
+                                .db_handler
+                                .get_blocks(group.start as i64, group.end as i64)
+                                .await
+                                .unwrap(),
+                            false => {
+                                let items = schduler
+                                    .shared
+                                    .rpc_handler
+                                    .get_blocks(group.start, group.end)
+                                    .unwrap()
+                                    .data
+                                    .blocks;
+                                items
+                                    .into_iter()
+                                    .map(|item| item.block.to_inner())
+                                    .collect()
+                            }
+                        };
+
+                        let _ = scheduling_tasks(schduler.clone(), &accounts_should_scan, blocks)
+                            .await
+                            .unwrap();
                     }
                 }
             }
@@ -247,7 +258,7 @@ pub async fn run_dserver(
                 .read()
                 .await
                 .iter()
-                .filter(|(_k, v)| v.since.elapsed().as_secs() >= 300)
+                .filter(|(_k, v)| v.since.elapsed().as_secs() >= 600)
                 .map(|(k, _)| k.to_string())
             {
                 info!("rescheduling task: {:?}", key);
@@ -261,10 +272,8 @@ pub async fn run_dserver(
                             .get_account(address.clone())
                             .await
                         {
-                            if let Ok(block) =
-                                secondary.shared.rpc_handler.get_block(sequence as i64)
-                            {
-                                let block = block.data.block;
+                            if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence) {
+                                let block = block.data.block.to_inner();
                                 let _ = scheduling_tasks(
                                     secondary.clone(),
                                     &vec![account],

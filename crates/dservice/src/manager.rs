@@ -53,7 +53,7 @@ impl ServerWorker {
 #[derive(Debug, Clone)]
 pub struct TaskInfo {
     pub since: Instant,
-    pub sequence: u32,
+    pub sequence: i64,
     pub hash: String,
     pub address: String,
 }
@@ -101,7 +101,7 @@ where
 #[derive(Debug, Clone)]
 pub struct Manager {
     pub workers: Arc<RwLock<HashMap<String, ServerWorker>>>,
-    pub task_queue: Arc<RwLock<PriorityQueue<DRequest, Reverse<u32>>>>,
+    pub task_queue: Arc<RwLock<PriorityQueue<DRequest, Reverse<i64>>>>,
     pub task_mapping: Arc<RwLock<HashMap<String, TaskInfo>>>,
     pub account_mappling: Arc<RwLock<HashMap<String, AccountInfo>>>,
     pub shared: Arc<SharedState<PgHandler>>,

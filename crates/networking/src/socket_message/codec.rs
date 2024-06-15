@@ -1,12 +1,10 @@
 use anyhow::Result;
 use bytes::{BufMut, BytesMut};
-use db_handler::Account;
+use db_handler::{Account, DBTransaction};
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use tokio_util::codec::{Decoder, Encoder};
 use uuid::Uuid;
-
-use crate::rpc_abi::{RpcEncryptedNote, RpcTransaction};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct RegisterWorker {
@@ -16,17 +14,8 @@ pub struct RegisterWorker {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SingleRequest {
-    pub serialized_note: String,
+    pub serialized_note: Vec<String>,
     pub tx_hash: String,
-}
-
-impl SingleRequest {
-    pub fn new(tx_hash: &str, note: &RpcEncryptedNote) -> Self {
-        Self {
-            tx_hash: tx_hash.to_string(),
-            serialized_note: note.serialized.to_string(),
-        }
-    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Hash, Eq)]
@@ -41,34 +30,31 @@ pub struct DRequest {
 }
 
 impl DRequest {
-    pub fn new(account: &Account, transaction: &RpcTransaction) -> Self {
-        let tx_hash = &transaction.hash;
-        let data = transaction
-            .notes
-            .iter()
-            .map(|note| SingleRequest::new(tx_hash, note))
-            .collect();
+    pub fn new(account: &Account, transaction: DBTransaction) -> Self {
+        let tx_hash = transaction.hash;
+        let serializeds = transaction.serialized_notes;
+        let data = SingleRequest {
+            tx_hash,
+            serialized_note: serializeds,
+        };
         Self {
             id: Uuid::new_v4().to_string(),
             address: account.address.clone(),
             incoming_view_key: account.in_vk.clone(),
             outgoing_view_key: account.out_vk.clone(),
             decrypt_for_spender: true,
-            data,
+            data: vec![data],
         }
     }
 
-    pub fn from_transactions(account: &Account, transactions: &Vec<RpcTransaction>) -> Self {
+    pub fn from_transactions(account: &Account, transactions: Vec<DBTransaction>) -> Self {
         let data = transactions
-            .iter()
-            .map(|tx| {
-                tx.notes
-                    .iter()
-                    .map(|note| SingleRequest::new(&tx.hash, note))
-                    .collect::<Vec<SingleRequest>>()
+            .into_iter()
+            .map(|tx| SingleRequest {
+                tx_hash: tx.hash.to_string(),
+                serialized_note: tx.serialized_notes,
             })
-            .collect::<Vec<Vec<SingleRequest>>>()
-            .concat();
+            .collect();
         Self {
             id: Uuid::new_v4().to_string(),
             address: account.address.clone(),
