@@ -1,8 +1,9 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Instant};
 
 use futures::executor::block_on;
 use oreo_errors::OreoError;
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgPool, Row};
+use tracing::debug;
 
 use crate::{DBBlock, DBTransaction, InnerBlock};
 
@@ -131,13 +132,27 @@ impl PgHandler {
         Ok(result)
     }
 
+    pub async fn get_compact_block_headers(
+        &self,
+        start: i64,
+        end: i64,
+    ) -> Result<Vec<DBBlock>, sqlx::Error> {
+        let result =
+            sqlx::query_as("SELECT * FROM wallet.blocks WHERE sequence >= $1 AND sequence <= $2")
+                .bind(start)
+                .bind(end)
+                .fetch_all(&self.pool)
+                .await?;
+        Ok(result)
+    }
+
     pub async fn get_compact_transactions(
         &self,
-        txs: Vec<String>,
+        block_hash: String,
     ) -> Result<Vec<DBTransaction>, sqlx::Error> {
         let result =
-            sqlx::query_as("SELECT * FROM wallet.txs WHERE hash IN (SELECT * FROM UNNEST($1))")
-                .bind(txs)
+            sqlx::query_as("SELECT hash, serialized_notes FROM wallet.txs WHERE block_hash = $1")
+                .bind(block_hash)
                 .fetch_all(&self.pool)
                 .await?;
         Ok(result)
@@ -221,21 +236,25 @@ impl DBHandler for PgHandler {
 
     async fn get_blocks(&self, start: i64, end: i64) -> Result<Vec<InnerBlock>, OreoError> {
         let mut blocks = vec![];
-        for sequence in start..end + 1 {
-            let block = self
-                .get_compact_block_header(sequence)
-                .await
-                .map_err(|_| OreoError::DBError)?;
+        let start_time = Instant::now();
+        debug!("get blocks starts");
+        let headers = self
+            .get_compact_block_headers(start, end)
+            .await
+            .map_err(|_| OreoError::DBError)?;
+        for head in headers {
             let transactions = self
-                .get_compact_transactions(block.transactions.clone())
-                .await;
-            let transactions = transactions.unwrap();
+                .get_compact_transactions(head.hash.clone())
+                .await
+                .unwrap();
             blocks.push(InnerBlock {
-                hash: block.hash,
-                sequence: block.sequence,
+                hash: head.hash,
+                sequence: head.sequence,
                 transactions,
             });
         }
+        let elapsed = start_time.elapsed().as_millis();
+        debug!("get blocks takes {} mill", elapsed);
         Ok(blocks)
     }
 }
