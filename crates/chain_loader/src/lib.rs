@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use constants::{LOCAL_BLOCKS_CHECKPOINT, PRIMARY_BATCH};
 use db_handler::{DBHandler, DBTransaction, InnerBlock, PgHandler};
 use networking::{rpc_abi::RpcBlock, rpc_handler::RpcHandler};
+use tokio::time::sleep;
 use tracing::info;
 use utils::blocks_range;
 
@@ -14,7 +17,15 @@ pub async fn load_checkpoint(rpc_node: String, db_handler: PgHandler) -> anyhow:
         {
             continue;
         }
-        let results = rpc_handler.get_blocks(group.start, group.end).unwrap();
+        let results = {
+            loop {
+                match rpc_handler.get_blocks(group.start, group.end) {
+                    Ok(res) => break res,
+                    Err(_) => {}
+                }
+                sleep(Duration::from_secs(3)).await;
+            }
+        };
         let blocks: Vec<RpcBlock> = results
             .data
             .blocks
