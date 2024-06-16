@@ -11,7 +11,7 @@ pub async fn load_checkpoint(rpc_node: String, db_handler: PgHandler) -> anyhow:
     let rpc_handler = RpcHandler::new(rpc_node);
     for group in blocks_range(1..LOCAL_BLOCKS_CHECKPOINT + 1, PRIMARY_BATCH) {
         if db_handler
-            .get_blocks(group.end as i64, group.end as i64)
+            .get_blocks(group.start as i64, group.end as i64)
             .await
             .is_ok()
         {
