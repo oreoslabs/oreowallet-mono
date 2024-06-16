@@ -255,7 +255,10 @@ impl DBHandler for PgHandler {
         }
         let elapsed = start_time.elapsed().as_millis();
         debug!("get blocks takes {} mill", elapsed);
-        Ok(blocks)
+        match blocks.len() as i64 == (end - start + 1) {
+            true => Ok(blocks),
+            false => Err(OreoError::DBError),
+        }
     }
 }
 
