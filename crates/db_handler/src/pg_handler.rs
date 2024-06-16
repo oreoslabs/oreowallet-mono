@@ -111,12 +111,14 @@ impl PgHandler {
 
     pub async fn insert_compact_transaction(
         &self,
+        block_hash: String,
         transaction: DBTransaction,
     ) -> Result<String, sqlx::Error> {
         let result = sqlx::query(
-            "INSERT INTO wallet.txs (hash, serialized_notes) VALUES ($1, $2) RETURNING hash",
+            "INSERT INTO wallet.txs (hash, block_hash, serialized_notes) VALUES ($1, $2, $3) RETURNING hash",
         )
         .bind(transaction.hash.clone())
+        .bind(block_hash)
         .bind(transaction.serialized_notes)
         .fetch_one(&self.pool)
         .await?
@@ -226,7 +228,9 @@ impl DBHandler for PgHandler {
             let transactions = block.transactions.clone();
             let transaction = self.pool.begin().await.unwrap();
             for tx in transactions {
-                let _ = self.insert_compact_transaction(tx).await;
+                let _ = self
+                    .insert_compact_transaction(block.hash.clone(), tx)
+                    .await;
             }
             let _ = self.insert_compact_block(DBBlock::new(block)).await;
             transaction.rollback().await.unwrap();
