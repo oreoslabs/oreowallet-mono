@@ -211,7 +211,10 @@ impl DBHandler for PgHandler {
             .get_compact_blocks(start, end)
             .await
             .map_err(|_| OreoError::DBError)?;
-        Ok(blocks)
+        match blocks.len() as i64 == (end - start + 1) {
+            true => Ok(blocks),
+            false => Err(OreoError::DBError),
+        }
     }
 }
 

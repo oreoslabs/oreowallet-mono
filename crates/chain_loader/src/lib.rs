@@ -16,9 +16,6 @@ pub async fn load_checkpoint(rpc_node: String, db_handler: PgHandler) -> anyhow:
             .is_ok()
         {
             continue;
-        } else {
-            info!("failed to get blocks {} {}", group.start, group.end);
-            sleep(Duration::from_secs(300)).await;
         }
         let results = {
             loop {
