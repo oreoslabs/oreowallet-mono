@@ -35,7 +35,7 @@ pub async fn scheduling_tasks(
             .await
             .get(&account.address)
         {
-            info!(
+            debug!(
                 "start scanning {} blocks for account {:?}",
                 blocks.len(),
                 account.address.clone()
@@ -129,9 +129,10 @@ pub async fn run_dserver(
         let _ = router.send(());
         loop {
             {
-                let workers = status_manager.workers.read().await;
-                let workers: Vec<&String> = workers.keys().collect();
-                info!("online workers: {}, {:?}", workers.len(), workers);
+                info!(
+                    "online workers: {}",
+                    status_manager.workers.read().await.len()
+                );
                 info!(
                     "pending taskes in queue: {}",
                     status_manager.task_queue.read().await.len()
