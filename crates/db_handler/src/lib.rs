@@ -6,6 +6,8 @@ pub use config::DbConfig;
 pub use pg_handler::*;
 pub use redis_handler::*;
 
+pub use sqlx::types::Json;
+
 use oreo_errors::OreoError;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -54,37 +56,16 @@ pub fn address_to_name(address: &str) -> String {
     address.substring(0, 10).into()
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow, sqlx::Type)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
+#[sqlx(type_name = "db_transaction")]
 pub struct DBTransaction {
     pub hash: String,
     pub serialized_notes: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
-pub struct DBBlock {
-    pub hash: String,
-    pub sequence: i64,
-    pub transactions: Vec<String>,
-}
-
-impl DBBlock {
-    pub fn new(inner: InnerBlock) -> Self {
-        let InnerBlock {
-            hash,
-            sequence,
-            transactions,
-        } = inner;
-        Self {
-            hash,
-            sequence,
-            transactions: transactions.into_iter().map(|tx| tx.hash).collect(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
 pub struct InnerBlock {
     pub hash: String,
     pub sequence: i64,
-    pub transactions: Vec<DBTransaction>,
+    pub transactions: Json<Vec<DBTransaction>>,
 }

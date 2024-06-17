@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use constants::{LOCAL_BLOCKS_CHECKPOINT, PRIMARY_BATCH};
-use db_handler::{DBHandler, DBTransaction, InnerBlock, PgHandler};
+use db_handler::{DBHandler, DBTransaction, InnerBlock, Json, PgHandler};
 use networking::{rpc_abi::RpcBlock, rpc_handler::RpcHandler};
 use tokio::time::sleep;
 use tracing::info;
@@ -16,6 +16,9 @@ pub async fn load_checkpoint(rpc_node: String, db_handler: PgHandler) -> anyhow:
             .is_ok()
         {
             continue;
+        } else {
+            info!("failed to get blocks {} {}", group.start, group.end);
+            sleep(Duration::from_secs(300)).await;
         }
         let results = {
             loop {
@@ -37,14 +40,15 @@ pub async fn load_checkpoint(rpc_node: String, db_handler: PgHandler) -> anyhow:
             .map(|rpc| InnerBlock {
                 hash: rpc.hash.clone(),
                 sequence: rpc.sequence as i64,
-                transactions: rpc
-                    .transactions
-                    .into_iter()
-                    .map(|tx| DBTransaction {
-                        hash: tx.hash,
-                        serialized_notes: tx.notes.into_iter().map(|n| n.serialized).collect(),
-                    })
-                    .collect(),
+                transactions: Json(
+                    rpc.transactions
+                        .into_iter()
+                        .map(|tx| DBTransaction {
+                            hash: tx.hash,
+                            serialized_notes: tx.notes.into_iter().map(|n| n.serialized).collect(),
+                        })
+                        .collect(),
+                ),
             })
             .collect();
         info!(

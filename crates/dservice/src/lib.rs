@@ -1,6 +1,7 @@
 use std::{
     cmp::{self, Reverse},
     net::SocketAddr,
+    ops::Deref,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -46,7 +47,7 @@ pub async fn scheduling_tasks(
                     debug!("skip height {:?}", block.sequence);
                     continue;
                 }
-                let task = DRequest::from_transactions(account, block.transactions.clone());
+                let task = DRequest::from_transactions(account, block.transactions.deref().clone());
                 let task_id = task.id.clone();
                 let _ = scheduler.task_mapping.write().await.insert(
                     task_id,
