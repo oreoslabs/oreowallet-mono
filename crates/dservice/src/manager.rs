@@ -149,7 +149,7 @@ impl Manager {
                     None => {}
                 }
                 let send_future = outbound_w.send(DMessage::DRequest(request));
-                if let Err(error) = timeout(Duration::from_millis(200), send_future).await {
+                if let Err(error) = timeout(Duration::from_secs(3), send_future).await {
                     error!("send message to worker timeout: {}", error);
                 }
             }
@@ -225,6 +225,7 @@ impl Manager {
                 if let Some(task_info) = self.task_mapping.read().await.get(&task_id) {
                     let block_hash = task_info.hash.to_string();
                     if !response.data.is_empty() {
+                        info!("account info: {:?}", account);
                         info!("new available block {} for account {}", block_hash, address);
                         account.blocks.insert(
                             block_hash,

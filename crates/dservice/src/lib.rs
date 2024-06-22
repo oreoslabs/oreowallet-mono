@@ -143,6 +143,11 @@ pub async fn run_dserver(
     });
     let _ = handler.await;
 
+    {
+        info!("warmup, wait for worker to join");
+        sleep(Duration::from_secs(60)).await;
+    }
+
     // primary task scheduling
     let schduler = manager.clone();
     let (router, handler) = oneshot::channel();
@@ -241,6 +246,10 @@ pub async fn run_dserver(
                         let _ = scheduling_tasks(schduler.clone(), &accounts_should_scan, blocks)
                             .await
                             .unwrap();
+                        // avoid too much memory usage
+                        if group.end % 30000 == 0 {
+                            sleep(Duration::from_secs(1)).await;
+                        }
                     }
                 }
             }
