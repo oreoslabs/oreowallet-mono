@@ -1,5 +1,10 @@
 use std::{cmp, ops::Range, time::Duration};
 
+use secp256k1::{
+    ecdsa,
+    hashes::{sha256, Hash},
+    Error, Message, PublicKey, Secp256k1, SecretKey, Signing, Verification,
+};
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
@@ -46,4 +51,29 @@ pub fn blocks_range(blocks: Range<u64>, batch: u64) -> Vec<Range<u64>> {
         result.push(start..end)
     }
     result
+}
+
+pub fn verify<C: Verification>(
+    secp: &Secp256k1<C>,
+    msg: &[u8],
+    sig: [u8; 64],
+    pubkey: &[u8; 33],
+) -> Result<bool, Error> {
+    let msg = sha256::Hash::hash(msg);
+    let msg = Message::from_digest_slice(msg.as_ref())?;
+    let sig = ecdsa::Signature::from_compact(&sig)?;
+    let pubkey = PublicKey::from_slice(pubkey)?;
+
+    Ok(secp.verify_ecdsa(&msg, &sig, &pubkey).is_ok())
+}
+
+pub fn sign<C: Signing>(
+    secp: &Secp256k1<C>,
+    msg: &[u8],
+    seckey: &[u8; 32],
+) -> Result<ecdsa::Signature, Error> {
+    let msg = sha256::Hash::hash(msg);
+    let msg = Message::from_digest_slice(msg.as_ref())?;
+    let seckey = SecretKey::from_slice(seckey)?;
+    Ok(secp.sign_ecdsa(&msg, &seckey))
 }
