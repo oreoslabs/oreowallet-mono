@@ -1,3 +1,4 @@
+pub mod decryption_message;
 pub mod orescriptions;
 pub mod rpc_abi;
 pub mod rpc_handler;
