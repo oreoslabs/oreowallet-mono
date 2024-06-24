@@ -8,7 +8,7 @@ use axum::{
     BoxError, Router,
 };
 use db_handler::{DBHandler, PgHandler};
-use networking::rpc_handler::RpcHandler;
+use networking::{rpc_handler::RpcHandler, server_handler::ServerHandler};
 use tokio::net::TcpListener;
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
@@ -24,19 +24,29 @@ use crate::handlers::{
 mod handlers;
 
 #[derive(Debug, Clone)]
+pub struct SecpKey {
+    pub sk: [u8; 32],
+    pub pk: [u8; 33],
+}
+
+#[derive(Debug, Clone)]
 pub struct SharedState<T: DBHandler> {
     pub db_handler: T,
     pub rpc_handler: RpcHandler,
+    pub scan_handler: ServerHandler,
+    pub secp: SecpKey,
 }
 
 impl<T> SharedState<T>
 where
     T: DBHandler,
 {
-    pub fn new(db_handler: T, endpoint: &str) -> Self {
+    pub fn new(db_handler: T, endpoint: &str, scan: &str, secp: SecpKey) -> Self {
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
+            scan_handler: ServerHandler::new(scan.into()),
+            secp,
         }
     }
 }
@@ -45,8 +55,19 @@ pub async fn run_server(
     listen: SocketAddr,
     rpc_server: String,
     db_handler: PgHandler,
+    scan: String,
+    sk_u8: [u8; 32],
+    pk_u8: [u8; 33],
 ) -> Result<()> {
-    let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server));
+    let shared_resource = Arc::new(SharedState::new(
+        db_handler,
+        &rpc_server,
+        &scan,
+        SecpKey {
+            sk: sk_u8,
+            pk: pk_u8,
+        },
+    ));
 
     let router = Router::new()
         .route("/import", post(import_account_handler))

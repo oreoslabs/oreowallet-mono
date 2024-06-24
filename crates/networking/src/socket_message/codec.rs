@@ -6,6 +6,8 @@ use std::io::Write;
 use tokio_util::codec::{Decoder, Encoder};
 use uuid::Uuid;
 
+use crate::decryption_message::ScanRequest;
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct RegisterWorker {
     pub name: String,
@@ -47,7 +49,7 @@ impl DRequest {
         }
     }
 
-    pub fn from_transactions(account: &Account, transactions: Vec<DBTransaction>) -> Self {
+    pub fn from_transactions(account: &ScanRequest, transactions: Vec<DBTransaction>) -> Self {
         let data = transactions
             .into_iter()
             .map(|tx| SingleRequest {

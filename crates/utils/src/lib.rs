@@ -3,11 +3,13 @@ use std::{cmp, ops::Range, time::Duration};
 use secp256k1::{
     ecdsa,
     hashes::{sha256, Hash},
-    Error, Message, PublicKey, Secp256k1, SecretKey, Signing, Verification,
+    All, Error, Message, PublicKey, Secp256k1, SecretKey, Signing, Verification,
 };
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
+
+pub use secp256k1::ecdsa::Signature;
 
 pub async fn handle_signals() -> anyhow::Result<()> {
     let (router, handler) = oneshot::channel();
@@ -76,4 +78,8 @@ pub fn sign<C: Signing>(
     let msg = Message::from_digest_slice(msg.as_ref())?;
     let seckey = SecretKey::from_slice(seckey)?;
     Ok(secp.sign_ecdsa(&msg, &seckey))
+}
+
+pub fn default_secp() -> Secp256k1<All> {
+    Secp256k1::new()
 }

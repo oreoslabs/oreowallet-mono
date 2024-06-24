@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use axum::{
     extract::{self, State},
@@ -8,6 +8,7 @@ use axum::{
 use constants::{ACCOUNT_VERSION, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
 use db_handler::DBHandler;
 use networking::{
+    decryption_message::{DecryptionMessage, ScanRequest, ScanResponse},
     rpc_abi::{
         BlockInfo, OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
@@ -18,6 +19,7 @@ use networking::{
 };
 use oreo_errors::OreoError;
 use serde_json::json;
+use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;
 
@@ -135,6 +137,19 @@ pub async fn rescan_account_handler<T: DBHandler>(
         .db_handler
         .update_scan_status(account.address.clone(), true)
         .await;
+    let scan_request = ScanRequest {
+        address: account.address.clone(),
+        in_vk: account.in_vk.clone(),
+        out_vk: account.out_vk.clone(),
+    };
+    let msg = bincode::serialize(&scan_request).unwrap();
+    let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
+        .unwrap()
+        .to_string();
+    let _ = shared.scan_handler.submit_scan_request(DecryptionMessage {
+        message: scan_request,
+        signature,
+    });
     RpcResponse {
         status: 200,
         data: RescanAccountResponse { success: true },
@@ -144,21 +159,35 @@ pub async fn rescan_account_handler<T: DBHandler>(
 
 pub async fn update_scan_status_handler<T: DBHandler>(
     State(shared): State<Arc<SharedState<T>>>,
-    extract::Json(account): extract::Json<RpcGetAccountStatusRequest>,
+    extract::Json(response): extract::Json<DecryptionMessage<ScanResponse>>,
 ) -> impl IntoResponse {
-    let db_account = shared.db_handler.get_account(account.account.clone()).await;
-    if let Err(e) = db_account {
-        return e.into_response();
+    let DecryptionMessage { message, signature } = response;
+    let secp = default_secp();
+    let msg = bincode::serialize(&message).unwrap();
+    let signature = Signature::from_str(&signature).unwrap();
+    if let Ok(x) = verify(
+        &secp,
+        &msg[..],
+        signature.serialize_compact(),
+        &shared.secp.pk,
+    ) {
+        if x {
+            let db_account = shared.db_handler.get_account(message.account.clone()).await;
+            if let Err(e) = db_account {
+                return e.into_response();
+            }
+            let account = db_account.unwrap();
+            let _ = shared.rpc_handler.set_account_head(message);
+            let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
+                account: account.name.clone(),
+                enabled: true,
+            });
+            let _ = shared
+                .db_handler
+                .update_scan_status(account.address, false)
+                .await;
+        }
     }
-    let account = db_account.unwrap();
-    let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
-        account: account.name.clone(),
-        enabled: true,
-    });
-    let _ = shared
-        .db_handler
-        .update_scan_status(account.address, false)
-        .await;
     RpcResponse {
         status: 200,
         data: RescanAccountResponse { success: true },

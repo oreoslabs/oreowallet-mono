@@ -2,30 +2,42 @@ use std::{
     cmp::{self, Reverse},
     net::SocketAddr,
     ops::Deref,
+    str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
 
+use axum::{
+    error_handling::HandleErrorLayer,
+    extract::{self, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::post,
+    BoxError, Json, Router,
+};
 use constants::{
     LOCAL_BLOCKS_CHECKPOINT, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE, PRIMARY_BATCH,
     REORG_DEPTH, RESCHEDULING_DURATION,
 };
-use db_handler::{Account, DBHandler, InnerBlock, PgHandler};
-use manager::{AccountInfo, Manager, ServerMessage, SharedState, TaskInfo};
+use db_handler::{address_to_name, DBHandler, InnerBlock, PgHandler};
+use manager::{AccountInfo, Manager, SecpKey, ServerMessage, SharedState, TaskInfo};
 use networking::{
+    decryption_message::{DecryptionMessage, ScanRequest, SuccessResponse},
     rpc_abi::{BlockInfo, RpcGetAccountStatusRequest},
     socket_message::codec::DRequest,
 };
 use tokio::{net::TcpListener, sync::oneshot, time::sleep};
+use tower::{timeout::TimeoutLayer, ServiceBuilder};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{debug, error, info};
-use utils::blocks_range;
+use utils::{blocks_range, default_secp, verify, Signature};
 
 pub mod manager;
 pub mod router;
 
 pub async fn scheduling_tasks(
     scheduler: Arc<Manager>,
-    accounts: &Vec<Account>,
+    accounts: &Vec<ScanRequest>,
     blocks: Vec<InnerBlock>,
 ) -> anyhow::Result<()> {
     for account in accounts.iter() {
@@ -95,12 +107,19 @@ pub async fn scheduling_tasks(
 
 pub async fn run_dserver(
     dlisten: SocketAddr,
+    restful: SocketAddr,
     rpc_server: String,
     db_handler: PgHandler,
     server: String,
+    sk_u8: [u8; 32],
+    pk_u8: [u8; 33],
 ) -> anyhow::Result<()> {
-    let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server));
-    let manager = Manager::new(shared_resource, server);
+    let secp_key = SecpKey {
+        sk: sk_u8,
+        pk: pk_u8,
+    };
+    let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server, &server, secp_key));
+    let manager = Manager::new(shared_resource);
     let listener = TcpListener::bind(&dlisten).await.unwrap();
 
     // dworker handler
@@ -137,6 +156,10 @@ pub async fn run_dserver(
                     "pending taskes in queue: {}",
                     status_manager.task_queue.read().await.len()
                 );
+                info!(
+                    "pending account to scan: {:?}",
+                    status_manager.accounts_to_scan.read().await
+                );
             }
             sleep(Duration::from_secs(60)).await;
         }
@@ -151,11 +174,11 @@ pub async fn run_dserver(
     // primary task scheduling
     let schduler = manager.clone();
     let (router, handler) = oneshot::channel();
-    let scheduling_handler = tokio::spawn(async move {
-        let _ = router.send(());
-        loop {
-            if let Ok(accounts) = schduler.shared.db_handler.get_many_need_scan().await {
-                if !accounts.is_empty() {
+    let scheduling_handler =
+        tokio::spawn(async move {
+            let _ = router.send(());
+            loop {
+                if !schduler.accounts_to_scan.read().await.is_empty() {
                     let mut accounts_should_scan = vec![];
                     let mut scan_start = u64::MAX;
                     let latest = schduler
@@ -176,7 +199,7 @@ pub async fn run_dserver(
                         sequence: scan_end.sequence as u64,
                         hash: scan_end.hash,
                     };
-                    for account in accounts {
+                    while let Some(account) = schduler.accounts_to_scan.write().await.pop() {
                         if schduler
                             .account_mappling
                             .read()
@@ -188,14 +211,19 @@ pub async fn run_dserver(
                         }
                         if let Ok(status) = schduler.shared.rpc_handler.get_account_status(
                             RpcGetAccountStatusRequest {
-                                account: account.name.clone(),
+                                account: address_to_name(&account.address),
                             },
                         ) {
                             match status.data.account.head {
                                 Some(head) => {
                                     let _ = schduler.account_mappling.write().await.insert(
                                         account.address.clone(),
-                                        AccountInfo::new(head.clone(), scan_end.clone()),
+                                        AccountInfo::new(
+                                            head.clone(),
+                                            scan_end.clone(),
+                                            account.in_vk.clone(),
+                                            account.out_vk.clone(),
+                                        ),
                                     );
                                     scan_start = cmp::min(scan_start, head.sequence);
                                     accounts_should_scan.push(account);
@@ -209,6 +237,8 @@ pub async fn run_dserver(
                                                 sequence: MAINNET_GENESIS_SEQUENCE as u64,
                                             },
                                             scan_end.clone(),
+                                            account.in_vk.clone(),
+                                            account.out_vk.clone(),
                                         ),
                                     );
                                     scan_start = cmp::min(scan_start, 1);
@@ -252,10 +282,9 @@ pub async fn run_dserver(
                         }
                     }
                 }
+                sleep(RESCHEDULING_DURATION).await;
             }
-            sleep(RESCHEDULING_DURATION).await;
-        }
-    });
+        });
     let _ = handler.await;
 
     // secondary task scheduling
@@ -277,17 +306,17 @@ pub async fn run_dserver(
                     Some(task_info) => {
                         let address = task_info.address.to_string();
                         let sequence = task_info.sequence;
-                        if let Ok(account) = secondary
-                            .shared
-                            .db_handler
-                            .get_account(address.clone())
-                            .await
+                        if let Some(account) = secondary.account_mappling.read().await.get(&address)
                         {
                             if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence) {
                                 let block = block.data.block.to_inner();
                                 let _ = scheduling_tasks(
                                     secondary.clone(),
-                                    &vec![account],
+                                    &vec![ScanRequest {
+                                        address: address.clone(),
+                                        in_vk: account.in_vk.clone(),
+                                        out_vk: account.out_vk.clone(),
+                                    }],
                                     vec![block],
                                 )
                                 .await
@@ -303,14 +332,68 @@ pub async fn run_dserver(
     });
     let _ = handler.await;
 
+    let (router, handler) = oneshot::channel();
+    let restful_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        let _ = start_rest(manager.clone(), restful).await;
+    });
+    let _ = handler.await;
+
     let _ = tokio::join!(
         dworker_handler,
         status_update_handler,
         scheduling_handler,
-        secondary_scheduling_handler
+        secondary_scheduling_handler,
+        restful_handler,
     );
     std::future::pending::<()>().await;
     Ok(())
+}
+
+pub async fn start_rest(server: Arc<Manager>, restful: SocketAddr) -> anyhow::Result<()> {
+    let router = Router::new()
+        .route("/scanAccount", post(account_scanner_handler))
+        .with_state(server)
+        .layer(
+            ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(|_: BoxError| async {
+                    StatusCode::REQUEST_TIMEOUT
+                }))
+                .layer(TimeoutLayer::new(Duration::from_secs(60))),
+        )
+        .layer(
+            CorsLayer::new()
+                .allow_methods(Any)
+                .allow_origin(Any)
+                .allow_headers(Any),
+        );
+    let listener = TcpListener::bind(&restful).await?;
+    info!("rest server listening on {}", &restful);
+    axum::serve(listener, router).await?;
+    Ok(())
+}
+
+pub async fn account_scanner_handler(
+    State(manager): State<Arc<Manager>>,
+    extract::Json(request): extract::Json<DecryptionMessage<ScanRequest>>,
+) -> impl IntoResponse {
+    info!("new scan request coming: {:?}", request);
+    let DecryptionMessage { message, signature } = request;
+    let secp = default_secp();
+    let msg = bincode::serialize(&message).unwrap();
+    let signature = Signature::from_str(&signature).unwrap();
+    if let Ok(x) = verify(
+        &secp,
+        &msg[..],
+        signature.serialize_compact(),
+        &manager.shared.secp_key.pk,
+    ) {
+        if x {
+            let _ = manager.accounts_to_scan.write().await.push(message);
+            return Json(SuccessResponse { success: true });
+        }
+    }
+    Json(SuccessResponse { success: false })
 }
 
 #[cfg(test)]

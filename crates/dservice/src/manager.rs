@@ -6,14 +6,13 @@ use std::{
 };
 
 use anyhow::Result;
-use db_handler::{address_to_name, DBHandler, PgHandler};
+use db_handler::{DBHandler, PgHandler};
 use futures::{SinkExt, StreamExt};
 use networking::{
-    rpc_abi::{
-        BlockInfo, BlockWithHash, RpcGetAccountStatusRequest, RpcSetAccountHeadRequest,
-        TransactionWithHash,
-    },
+    decryption_message::{DecryptionMessage, ScanRequest},
+    rpc_abi::{BlockInfo, BlockWithHash, RpcSetAccountHeadRequest, TransactionWithHash},
     rpc_handler::RpcHandler,
+    server_handler::ServerHandler,
     socket_message::codec::{DMessage, DMessageCodec, DRequest, DResponse},
 };
 use priority_queue::PriorityQueue;
@@ -29,6 +28,7 @@ use tokio::{
 };
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::{debug, error, info, warn};
+use utils::{default_secp, sign};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -64,36 +64,55 @@ pub struct AccountInfo {
     pub start_block: BlockInfo,
     pub end_block: BlockInfo,
     pub remaining_task: u64,
+    pub in_vk: String,
+    pub out_vk: String,
     // mapping from block_hash to transaction list in this block
     pub blocks: HashMap<String, Vec<TransactionWithHash>>,
 }
 
 impl AccountInfo {
-    pub fn new(start_block: BlockInfo, end_block: BlockInfo) -> Self {
+    pub fn new(
+        start_block: BlockInfo,
+        end_block: BlockInfo,
+        in_vk: String,
+        out_vk: String,
+    ) -> Self {
         let remaining_task = end_block.sequence - start_block.sequence + 1;
         Self {
             start_block,
             end_block,
             remaining_task,
+            in_vk,
+            out_vk,
             blocks: HashMap::new(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
+pub struct SecpKey {
+    pub sk: [u8; 32],
+    pub pk: [u8; 33],
+}
+
+#[derive(Debug, Clone)]
 pub struct SharedState<T: DBHandler> {
     pub db_handler: T,
     pub rpc_handler: RpcHandler,
+    pub server_handler: ServerHandler,
+    pub secp_key: SecpKey,
 }
 
 impl<T> SharedState<T>
 where
     T: DBHandler,
 {
-    pub fn new(db_handler: T, endpoint: &str) -> Self {
+    pub fn new(db_handler: T, endpoint: &str, server: &str, secp_key: SecpKey) -> Self {
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
+            server_handler: ServerHandler::new(server.into()),
+            secp_key,
         }
     }
 }
@@ -105,18 +124,18 @@ pub struct Manager {
     pub task_mapping: Arc<RwLock<HashMap<String, TaskInfo>>>,
     pub account_mappling: Arc<RwLock<HashMap<String, AccountInfo>>>,
     pub shared: Arc<SharedState<PgHandler>>,
-    pub server: String,
+    pub accounts_to_scan: Arc<RwLock<Vec<ScanRequest>>>,
 }
 
 impl Manager {
-    pub fn new(shared: Arc<SharedState<PgHandler>>, server: String) -> Arc<Self> {
+    pub fn new(shared: Arc<SharedState<PgHandler>>) -> Arc<Self> {
         Arc::new(Self {
             workers: Arc::new(RwLock::new(HashMap::new())),
             task_queue: Arc::new(RwLock::new(PriorityQueue::new())),
             task_mapping: Arc::new(RwLock::new(HashMap::new())),
             account_mappling: Arc::new(RwLock::new(HashMap::new())),
             shared,
-            server,
+            accounts_to_scan: Arc::new(RwLock::new(vec![])),
         })
     }
 
@@ -256,7 +275,7 @@ impl Manager {
                 .unwrap()
                 .clone();
             let set_account_head_request = RpcSetAccountHeadRequest {
-                account: address_to_name(&address),
+                account: address.clone(),
                 start: account_info.start_block.hash.to_string(),
                 end: account_info.end_block.hash.to_string(),
                 blocks: account_info
@@ -268,13 +287,23 @@ impl Manager {
                     })
                     .collect(),
             };
-            let _ = self
-                .shared
-                .rpc_handler
-                .set_account_head(set_account_head_request);
-            let _ = self.account_mappling.write().await.remove(&address);
-            let _ = networking::ureq::post(&format!("http://{}/updateScan", self.server))
-                .send_json(RpcGetAccountStatusRequest { account: address });
+            let msg = bincode::serialize(&set_account_head_request).unwrap();
+            let secp = default_secp();
+            let signature = sign(&secp, &msg[..], &self.shared.secp_key.sk)
+                .unwrap()
+                .to_string();
+            let request = DecryptionMessage {
+                message: set_account_head_request,
+                signature,
+            };
+            match self.shared.server_handler.submit_scan_response(request) {
+                Ok(msg) => {
+                    if msg.success {
+                        let _ = self.account_mappling.write().await.remove(&address);
+                    }
+                }
+                Err(_) => error!("failed to submit decryption response to server"),
+            }
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
         Ok(())
