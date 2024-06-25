@@ -161,7 +161,10 @@ pub async fn update_scan_status_handler<T: DBHandler>(
     State(shared): State<Arc<SharedState<T>>>,
     extract::Json(response): extract::Json<DecryptionMessage<ScanResponse>>,
 ) -> impl IntoResponse {
-    let DecryptionMessage { message, signature } = response;
+    let DecryptionMessage {
+        mut message,
+        signature,
+    } = response;
     let secp = default_secp();
     let msg = bincode::serialize(&message).unwrap();
     let signature = Signature::from_str(&signature).unwrap();
@@ -177,6 +180,7 @@ pub async fn update_scan_status_handler<T: DBHandler>(
                 return e.into_response();
             }
             let account = db_account.unwrap();
+            message.account = account.name.clone();
             let _ = shared.rpc_handler.set_account_head(message);
             let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                 account: account.name.clone(),
