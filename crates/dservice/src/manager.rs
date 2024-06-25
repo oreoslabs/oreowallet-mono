@@ -302,7 +302,7 @@ impl Manager {
                         let _ = self.account_mappling.write().await.remove(&address);
                     }
                 }
-                Err(_) => error!("failed to submit decryption response to server"),
+                Err(e) => error!("failed to submit decryption response to server, {:?}", e),
             }
         }
         let _ = self.task_mapping.write().await.remove(&task_id);

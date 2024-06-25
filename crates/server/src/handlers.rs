@@ -8,7 +8,7 @@ use axum::{
 use constants::{ACCOUNT_VERSION, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
 use db_handler::DBHandler;
 use networking::{
-    decryption_message::{DecryptionMessage, ScanRequest, ScanResponse},
+    decryption_message::{DecryptionMessage, ScanRequest, ScanResponse, SuccessResponse},
     rpc_abi::{
         BlockInfo, OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
@@ -190,13 +190,10 @@ pub async fn update_scan_status_handler<T: DBHandler>(
                 .db_handler
                 .update_scan_status(account.address, false)
                 .await;
+            return Json(SuccessResponse { success: true }).into_response();
         }
     }
-    RpcResponse {
-        status: 200,
-        data: RescanAccountResponse { success: true },
-    }
-    .into_response()
+    Json(SuccessResponse { success: false }).into_response()
 }
 
 pub async fn get_balances_handler<T: DBHandler>(
