@@ -7,6 +7,7 @@ use crate::rpc_abi::AssetBalance;
 #[serde(rename_all = "camelCase")]
 pub struct Ores {
     pub asset_id: String,
+    pub mint_height: u32,
     pub tick: String,
     pub tick_index: u32,
     pub data: String,
