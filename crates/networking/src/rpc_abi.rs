@@ -17,7 +17,7 @@ impl<T: Serialize> IntoResponse for RpcResponse<T> {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct BlockInfo {
     pub hash: String,
     pub sequence: u64,

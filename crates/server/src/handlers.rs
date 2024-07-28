@@ -12,8 +12,8 @@ use networking::{
     rpc_abi::{
         BlockInfo, OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
-        RpcGetTransactionsRequest, RpcImportAccountRequest, RpcRemoveAccountRequest,
-        RpcResetAccountRequest, RpcResponse, RpcSetScanningRequest,
+        RpcGetTransactionsRequest, RpcImportAccountRequest, RpcImportAccountResponse,
+        RpcRemoveAccountRequest, RpcResetAccountRequest, RpcResponse, RpcSetScanningRequest,
     },
     web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
 };
@@ -34,6 +34,7 @@ pub async fn import_account_handler<T: DBHandler>(
     if let Err(e) = account_name {
         return e.into_response();
     }
+    let account_name = account_name.unwrap();
     let ImportAccountRequest {
         view_key,
         incoming_view_key,
@@ -43,14 +44,65 @@ pub async fn import_account_handler<T: DBHandler>(
     } = import;
     let rpc_data = RpcImportAccountRequest {
         view_key,
-        incoming_view_key,
-        outgoing_view_key,
-        public_address,
+        incoming_view_key: incoming_view_key.clone(),
+        outgoing_view_key: outgoing_view_key.clone(),
+        public_address: public_address.clone(),
         version: ACCOUNT_VERSION,
-        name: account_name.unwrap(),
+        name: account_name.clone(),
         created_at,
     };
-    shared.rpc_handler.import_account(rpc_data).into_response()
+    match shared.rpc_handler.import_account(rpc_data) {
+        Ok(_) => {
+            let latest = shared.rpc_handler.get_latest_block().unwrap();
+            let latest_height = latest
+                .data
+                .current_block_identifier
+                .index
+                .parse::<u64>()
+                .unwrap();
+            shared
+                .rpc_handler
+                .get_account_status(RpcGetAccountStatusRequest {
+                    account: account_name.clone(),
+                })
+                .map(|x| {
+                    if latest_height - x.data.account.head.unwrap_or(Default::default()).sequence
+                        > 1000
+                    {
+                        let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
+                            account: account_name.clone(),
+                            enabled: false,
+                        });
+                        let _ = shared.rpc_handler.reset_account(RpcResetAccountRequest {
+                            account: account_name.clone(),
+                            reset_scanning_enabled: Some(false),
+                            reset_created_at: Some(false),
+                        });
+                        let scan_request = ScanRequest {
+                            address: public_address.clone(),
+                            in_vk: incoming_view_key.clone(),
+                            out_vk: outgoing_view_key.clone(),
+                        };
+                        let msg = bincode::serialize(&scan_request).unwrap();
+                        let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
+                            .unwrap()
+                            .to_string();
+                        let _ = shared.scan_handler.submit_scan_request(DecryptionMessage {
+                            message: scan_request,
+                            signature,
+                        });
+                    }
+                    RpcResponse {
+                        status: 200,
+                        data: RpcImportAccountResponse {
+                            name: account_name.clone(),
+                        },
+                    }
+                })
+                .into_response()
+        }
+        Err(e) => e.into_response(),
+    }
 }
 
 pub async fn remove_account_handler<T: DBHandler>(
