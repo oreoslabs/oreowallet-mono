@@ -178,7 +178,11 @@ pub async fn run_dserver(
         tokio::spawn(async move {
             let _ = router.send(());
             loop {
+                sleep(RESCHEDULING_DURATION).await;
                 if !schduler.accounts_to_scan.read().await.is_empty() {
+                    if !schduler.account_mappling.read().await.is_empty() {
+                        continue;
+                    }
                     let mut accounts_should_scan = vec![];
                     let mut scan_start = u64::MAX;
                     let latest = schduler
@@ -247,6 +251,9 @@ pub async fn run_dserver(
                             }
                         }
                     }
+                    if accounts_should_scan.is_empty() {
+                        continue;
+                    }
                     info!("accounts to scanning, {:?}", accounts_should_scan);
                     let blocks_to_scan =
                         blocks_range(scan_start..scan_end.sequence + 1, PRIMARY_BATCH);
@@ -282,7 +289,6 @@ pub async fn run_dserver(
                         }
                     }
                 }
-                sleep(RESCHEDULING_DURATION).await;
             }
         });
     let _ = handler.await;
