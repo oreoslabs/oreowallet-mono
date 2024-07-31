@@ -66,9 +66,8 @@ pub async fn import_account_handler<T: DBHandler>(
                     account: account_name.clone(),
                 })
                 .map(|x| {
-                    if latest_height - x.data.account.head.unwrap_or(Default::default()).sequence
-                        > 1000
-                    {
+                    let head = x.data.account.head.unwrap_or(BlockInfo::default());
+                    if latest_height - head.sequence > 1000 {
                         let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                             account: account_name.clone(),
                             enabled: false,
@@ -82,6 +81,7 @@ pub async fn import_account_handler<T: DBHandler>(
                             address: public_address.clone(),
                             in_vk: incoming_view_key.clone(),
                             out_vk: outgoing_view_key.clone(),
+                            head: Some(head),
                         };
                         let msg = bincode::serialize(&scan_request).unwrap();
                         let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
@@ -189,19 +189,28 @@ pub async fn rescan_account_handler<T: DBHandler>(
         .db_handler
         .update_scan_status(account.address.clone(), true)
         .await;
-    let scan_request = ScanRequest {
-        address: account.address.clone(),
-        in_vk: account.in_vk.clone(),
-        out_vk: account.out_vk.clone(),
-    };
-    let msg = bincode::serialize(&scan_request).unwrap();
-    let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
-        .unwrap()
-        .to_string();
-    let _ = shared.scan_handler.submit_scan_request(DecryptionMessage {
-        message: scan_request,
-        signature,
-    });
+    if let Ok(status) = shared
+        .rpc_handler
+        .get_account_status(RpcGetAccountStatusRequest {
+            account: account.name.clone(),
+        })
+    {
+        let head = status.data.account.head.unwrap_or(BlockInfo::default());
+        let scan_request = ScanRequest {
+            address: account.address.clone(),
+            in_vk: account.in_vk.clone(),
+            out_vk: account.out_vk.clone(),
+            head: Some(head),
+        };
+        let msg = bincode::serialize(&scan_request).unwrap();
+        let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
+            .unwrap()
+            .to_string();
+        let _ = shared.scan_handler.submit_scan_request(DecryptionMessage {
+            message: scan_request,
+            signature,
+        });
+    }
     RpcResponse {
         status: 200,
         data: RescanAccountResponse { success: true },

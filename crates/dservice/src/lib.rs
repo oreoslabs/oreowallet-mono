@@ -15,15 +15,12 @@ use axum::{
     routing::post,
     BoxError, Json, Router,
 };
-use constants::{
-    LOCAL_BLOCKS_CHECKPOINT, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE, PRIMARY_BATCH,
-    REORG_DEPTH, RESCHEDULING_DURATION,
-};
-use db_handler::{address_to_name, DBHandler, InnerBlock, PgHandler};
+use constants::{LOCAL_BLOCKS_CHECKPOINT, PRIMARY_BATCH, REORG_DEPTH, RESCHEDULING_DURATION};
+use db_handler::{DBHandler, InnerBlock, PgHandler};
 use manager::{AccountInfo, Manager, SecpKey, ServerMessage, SharedState, TaskInfo};
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest, SuccessResponse},
-    rpc_abi::{BlockInfo, RpcGetAccountStatusRequest},
+    rpc_abi::BlockInfo,
     socket_message::codec::DRequest,
 };
 use tokio::{net::TcpListener, sync::oneshot, time::sleep};
@@ -174,123 +171,96 @@ pub async fn run_dserver(
     // primary task scheduling
     let schduler = manager.clone();
     let (router, handler) = oneshot::channel();
-    let scheduling_handler =
-        tokio::spawn(async move {
-            let _ = router.send(());
-            loop {
-                sleep(RESCHEDULING_DURATION).await;
-                if !schduler.accounts_to_scan.read().await.is_empty() {
-                    if !schduler.account_mappling.read().await.is_empty() {
+    let scheduling_handler = tokio::spawn(async move {
+        let _ = router.send(());
+        loop {
+            sleep(RESCHEDULING_DURATION).await;
+            if !schduler.accounts_to_scan.read().await.is_empty() {
+                if !schduler.account_mappling.read().await.is_empty() {
+                    continue;
+                }
+                let mut accounts_should_scan = vec![];
+                let mut scan_start = u64::MAX;
+                let latest = schduler
+                    .shared
+                    .rpc_handler
+                    .get_latest_block()
+                    .unwrap()
+                    .data
+                    .current_block_identifier;
+                let scan_end = schduler
+                    .shared
+                    .rpc_handler
+                    .get_block(latest.index.parse::<i64>().unwrap() - REORG_DEPTH)
+                    .unwrap()
+                    .data
+                    .block;
+                let scan_end = BlockInfo {
+                    sequence: scan_end.sequence as u64,
+                    hash: scan_end.hash,
+                };
+                while let Some(account) = schduler.accounts_to_scan.write().await.pop() {
+                    if schduler
+                        .account_mappling
+                        .read()
+                        .await
+                        .get(&account.address)
+                        .is_some()
+                    {
                         continue;
                     }
-                    let mut accounts_should_scan = vec![];
-                    let mut scan_start = u64::MAX;
-                    let latest = schduler
-                        .shared
-                        .rpc_handler
-                        .get_latest_block()
-                        .unwrap()
-                        .data
-                        .current_block_identifier;
-                    let scan_end = schduler
-                        .shared
-                        .rpc_handler
-                        .get_block(latest.index.parse::<i64>().unwrap() - REORG_DEPTH)
-                        .unwrap()
-                        .data
-                        .block;
-                    let scan_end = BlockInfo {
-                        sequence: scan_end.sequence as u64,
-                        hash: scan_end.hash,
-                    };
-                    while let Some(account) = schduler.accounts_to_scan.write().await.pop() {
-                        if schduler
-                            .account_mappling
-                            .read()
+                    let head = account.head.clone().unwrap();
+                    let _ = schduler.account_mappling.write().await.insert(
+                        account.address.clone(),
+                        AccountInfo::new(
+                            head.clone(),
+                            scan_end.clone(),
+                            account.in_vk.clone(),
+                            account.out_vk.clone(),
+                        ),
+                    );
+                    scan_start = cmp::min(scan_start, head.sequence);
+                    accounts_should_scan.push(account);
+                }
+                if accounts_should_scan.is_empty() {
+                    continue;
+                }
+                info!("accounts to scanning, {:?}", accounts_should_scan);
+                let blocks_to_scan = blocks_range(scan_start..scan_end.sequence + 1, PRIMARY_BATCH);
+                for group in blocks_to_scan {
+                    let blocks = match group.end <= LOCAL_BLOCKS_CHECKPOINT {
+                        true => schduler
+                            .shared
+                            .db_handler
+                            .get_blocks(group.start as i64, group.end as i64)
                             .await
-                            .get(&account.address)
-                            .is_some()
-                        {
-                            continue;
-                        }
-                        if let Ok(status) = schduler.shared.rpc_handler.get_account_status(
-                            RpcGetAccountStatusRequest {
-                                account: address_to_name(&account.address),
-                            },
-                        ) {
-                            match status.data.account.head {
-                                Some(head) => {
-                                    let _ = schduler.account_mappling.write().await.insert(
-                                        account.address.clone(),
-                                        AccountInfo::new(
-                                            head.clone(),
-                                            scan_end.clone(),
-                                            account.in_vk.clone(),
-                                            account.out_vk.clone(),
-                                        ),
-                                    );
-                                    scan_start = cmp::min(scan_start, head.sequence);
-                                    accounts_should_scan.push(account);
-                                }
-                                None => {
-                                    let _ = schduler.account_mappling.write().await.insert(
-                                        account.address.clone(),
-                                        AccountInfo::new(
-                                            BlockInfo {
-                                                hash: MAINNET_GENESIS_HASH.to_string(),
-                                                sequence: MAINNET_GENESIS_SEQUENCE as u64,
-                                            },
-                                            scan_end.clone(),
-                                            account.in_vk.clone(),
-                                            account.out_vk.clone(),
-                                        ),
-                                    );
-                                    scan_start = cmp::min(scan_start, 1);
-                                    accounts_should_scan.push(account);
-                                }
-                            }
-                        }
-                    }
-                    if accounts_should_scan.is_empty() {
-                        continue;
-                    }
-                    info!("accounts to scanning, {:?}", accounts_should_scan);
-                    let blocks_to_scan =
-                        blocks_range(scan_start..scan_end.sequence + 1, PRIMARY_BATCH);
-                    for group in blocks_to_scan {
-                        let blocks = match group.end <= LOCAL_BLOCKS_CHECKPOINT {
-                            true => schduler
+                            .unwrap(),
+                        false => {
+                            let items = schduler
                                 .shared
-                                .db_handler
-                                .get_blocks(group.start as i64, group.end as i64)
-                                .await
-                                .unwrap(),
-                            false => {
-                                let items = schduler
-                                    .shared
-                                    .rpc_handler
-                                    .get_blocks(group.start, group.end)
-                                    .unwrap()
-                                    .data
-                                    .blocks;
-                                items
-                                    .into_iter()
-                                    .map(|item| item.block.to_inner())
-                                    .collect()
-                            }
-                        };
-
-                        let _ = scheduling_tasks(schduler.clone(), &accounts_should_scan, blocks)
-                            .await
-                            .unwrap();
-                        // avoid too much memory usage
-                        if group.end % 30000 == 0 {
-                            sleep(Duration::from_secs(1)).await;
+                                .rpc_handler
+                                .get_blocks(group.start, group.end)
+                                .unwrap()
+                                .data
+                                .blocks;
+                            items
+                                .into_iter()
+                                .map(|item| item.block.to_inner())
+                                .collect()
                         }
+                    };
+
+                    let _ = scheduling_tasks(schduler.clone(), &accounts_should_scan, blocks)
+                        .await
+                        .unwrap();
+                    // avoid too much memory usage
+                    if group.end % 30000 == 0 {
+                        sleep(Duration::from_secs(1)).await;
                     }
                 }
             }
-        });
+        }
+    });
     let _ = handler.await;
 
     // secondary task scheduling
@@ -322,6 +292,7 @@ pub async fn run_dserver(
                                         address: address.clone(),
                                         in_vk: account.in_vk.clone(),
                                         out_vk: account.out_vk.clone(),
+                                        head: Some(account.start_block.clone()),
                                     }],
                                     vec![block],
                                 )
