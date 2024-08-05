@@ -69,3 +69,9 @@ pub struct InnerBlock {
     pub sequence: i64,
     pub transactions: Json<Vec<DBTransaction>>,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+pub struct BonusAddress {
+    pub address: String,
+    pub paid: bool,
+}

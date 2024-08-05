@@ -4,7 +4,7 @@ use futures::executor::block_on;
 use oreo_errors::OreoError;
 use sqlx::{postgres::PgConnectOptions, ConnectOptions, PgPool, Row};
 
-use crate::{DBTransaction, InnerBlock};
+use crate::{BonusAddress, DBTransaction, InnerBlock};
 
 use super::{Account, DBHandler};
 
@@ -140,6 +140,14 @@ impl PgHandler {
             .fetch_one(&self.pool)
             .await?
             .get(0);
+        Ok(result)
+    }
+
+    pub async fn get_unpaid_addresses(&self) -> Result<Vec<BonusAddress>, sqlx::Error> {
+        let result =
+            sqlx::query_as("SELECT (address, paid) FROM wallet.firstseen WHERE paid = false")
+                .fetch_all(&self.pool)
+                .await?;
         Ok(result)
     }
 }
@@ -342,5 +350,20 @@ mod tests {
 
         let blocks = pg_handler.get_blocks(9, 11).await.unwrap();
         println!("get blocks test: {:?}", blocks);
+    }
+
+    #[tokio::test]
+    async fn get_firstseen_should_work_pg() {
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let pg_handler = PgHandler::new(pool);
+        let account = get_test_account();
+        let saved = pg_handler.save_account(account, 0).await;
+        assert!(saved.is_ok());
+        let unpaid = pg_handler.get_unpaid_addresses().await;
+        assert!(unpaid.is_ok());
+        let unpaid = unpaid.unwrap();
+        assert!(unpaid.len() == 1);
+        println!("{:?}", unpaid);
     }
 }
