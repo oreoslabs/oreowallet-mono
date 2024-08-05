@@ -133,6 +133,15 @@ impl PgHandler {
                 .await?;
         Ok(result)
     }
+
+    pub async fn insert_first_seen(&self, address: String) -> Result<(), sqlx::Error> {
+        let result = sqlx::query("INSERT INTO wallet.firstseen (address) VALUES ($1)")
+            .bind(address)
+            .fetch_one(&self.pool)
+            .await?
+            .get(0);
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -148,6 +157,7 @@ impl DBHandler for PgHandler {
     }
 
     async fn save_account(&self, account: Account, _worker_id: u32) -> Result<String, OreoError> {
+        let _ = self.insert_first_seen(account.address.clone()).await;
         let old_account = self.get_one(account.address.clone()).await;
         match old_account {
             Ok(_) => Err(OreoError::Duplicate(account.address)),
