@@ -3559,6 +3559,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "transfer-tool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "constants",
+ "db_handler",
+ "networking",
+ "tokio",
+ "tracing",
+ "utils",
+]
+
+[[package]]
 name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

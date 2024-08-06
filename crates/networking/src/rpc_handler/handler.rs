@@ -15,7 +15,8 @@ use crate::{
         RpcGetBlocksResponse, RpcGetLatestBlockResponse, RpcGetTransactionsRequest,
         RpcGetTransactionsResponse, RpcImportAccountRequest, RpcImportAccountResponse,
         RpcRemoveAccountRequest, RpcRemoveAccountResponse, RpcResetAccountRequest, RpcResponse,
-        RpcSetAccountHeadRequest, RpcSetScanningRequest,
+        RpcSetAccountHeadRequest, RpcSetScanningRequest, SendTransactionRequest,
+        SendTransactionResponse,
     },
     rpc_handler::RpcError,
 };
@@ -193,6 +194,15 @@ impl RpcHandler {
             .clone()
             .post(&path)
             .send_json(RpcGetBlocksRequest { start, end });
+        handle_response(resp)
+    }
+
+    pub fn send_transaction(
+        &self,
+        request: SendTransactionRequest,
+    ) -> Result<RpcResponse<SendTransactionResponse>, OreoError> {
+        let path = format!("http://{}/wallet/sendTransaction", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
 }

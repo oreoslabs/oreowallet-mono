@@ -367,3 +367,17 @@ pub struct BlockItem {
 pub struct RpcGetBlocksResponse {
     pub blocks: Vec<BlockItem>,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SendTransactionRequest {
+    pub account: String,
+    pub fee: String,
+    pub expiration_delta: u32,
+    pub outputs: Vec<OutPut>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct SendTransactionResponse {
+    pub account: String,
+    pub hash: String,
+}
