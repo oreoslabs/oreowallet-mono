@@ -10,5 +10,5 @@ members = [
     "crates/prover",
     "crates/dworker",
     "crates/dservice",
-    "crates/chain_loader",
+    "crates/chain_loader", "crates/transfer-tool",
 ]
