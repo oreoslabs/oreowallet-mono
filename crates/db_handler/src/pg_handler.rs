@@ -150,6 +150,16 @@ impl PgHandler {
                 .await?;
         Ok(result)
     }
+
+    pub async fn update_firstseen_status(&self, address: String) -> Result<(), sqlx::Error> {
+        let result = sqlx::query("UPDATE wallet.firstseen SET paid = $1 WHERE address = $2")
+            .bind(true)
+            .bind(address)
+            .fetch_one(&self.pool)
+            .await?
+            .get(0);
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
