@@ -42,43 +42,47 @@ async fn main() -> Result<()> {
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
     let rpc_handler = RpcHandler::new(node);
-    if let Ok(accounts) = db_handler.get_unpaid_addresses().await {
-        let mut outputs = vec![];
-        for account in accounts.iter() {
-            if account.paid {
-                continue;
+    match db_handler.get_unpaid_addresses().await {
+        Ok(accounts) => {
+            info!("bonus accounts: {:?}", accounts);
+            let mut outputs = vec![];
+            for account in accounts.iter() {
+                if account.paid {
+                    continue;
+                }
+                outputs.push(OutPut {
+                    public_address: account.address.clone(),
+                    amount: bonus.clone(),
+                    memo: Some("OreoWallet-Bonus".to_string()),
+                    asset_id: Some(IRON_NATIVE_ASSET.to_string()),
+                });
             }
-            outputs.push(OutPut {
-                public_address: account.address.clone(),
-                amount: bonus.clone(),
-                memo: Some("OreoWallet-Bonus".to_string()),
-                asset_id: Some(IRON_NATIVE_ASSET.to_string()),
-            });
-        }
-        if outputs.is_empty() {
-            info!("no new bonus address");
-            return Ok(());
-        }
-        let send_request = SendTransactionRequest {
-            account: account.clone(),
-            fee: "10".to_string(),
-            expiration_delta: 30,
-            outputs,
-        };
-        let result = rpc_handler.send_transaction(send_request);
-        match result {
-            Ok(result) => {
-                info!("transaction sent, {}", result.data.hash);
-                for account in accounts.iter() {
-                    let _ = db_handler
-                        .update_firstseen_status(account.address.clone())
-                        .await;
+            if outputs.is_empty() {
+                info!("no new bonus address");
+                return Ok(());
+            }
+            let send_request = SendTransactionRequest {
+                account: account.clone(),
+                fee: "10".to_string(),
+                expiration_delta: 30,
+                outputs,
+            };
+            let result = rpc_handler.send_transaction(send_request);
+            match result {
+                Ok(result) => {
+                    info!("transaction sent, {}", result.data.hash);
+                    for account in accounts.iter() {
+                        let _ = db_handler
+                            .update_firstseen_status(account.address.clone())
+                            .await;
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("failed to send transaction, {:?}", e);
                 }
             }
-            Err(e) => {
-                tracing::error!("failed to send transaction, {:?}", e);
-            }
         }
+        Err(e) => tracing::error!("failed to get accounts, {:?}", e),
     }
     Ok(())
 }
