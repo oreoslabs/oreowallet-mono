@@ -145,7 +145,7 @@ impl PgHandler {
 
     pub async fn get_unpaid_addresses(&self) -> Result<Vec<BonusAddress>, sqlx::Error> {
         let result =
-            sqlx::query_as("SELECT (address, paid) FROM wallet.firstseen WHERE paid = false")
+            sqlx::query_as("SELECT address, paid FROM wallet.firstseen WHERE paid = False")
                 .fetch_all(&self.pool)
                 .await?;
         Ok(result)
