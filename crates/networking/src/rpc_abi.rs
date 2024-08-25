@@ -183,15 +183,18 @@ pub struct OutPut {
     pub public_address: String,
     pub amount: String,
     pub memo: Option<String>,
+    pub memo_hex: Option<String>,
     pub asset_id: Option<String>,
 }
 
 impl OutPut {
     pub fn from(base: OutPut) -> Self {
         let memo = Some(base.memo.unwrap_or("".into()));
+        let memo_hex = Some(base.memo_hex.unwrap_or("".into()));
         let asset_id = Some(base.asset_id.unwrap_or(IRON_NATIVE_ASSET.into()));
         Self {
             memo,
+            memo_hex,
             asset_id,
             ..base
         }
