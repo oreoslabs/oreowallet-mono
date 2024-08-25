@@ -54,6 +54,7 @@ async fn main() -> Result<()> {
                     public_address: account.address.clone(),
                     amount: bonus.clone(),
                     memo: Some("OreoWallet-Bonus".to_string()),
+                    memo_hex: Some("".into()),
                     asset_id: Some(IRON_NATIVE_ASSET.to_string()),
                 });
             }
