@@ -47,6 +47,7 @@ pub async fn import_account_handler<T: DBHandler>(
         incoming_view_key: incoming_view_key.clone(),
         outgoing_view_key: outgoing_view_key.clone(),
         public_address: public_address.clone(),
+        spending_key: None,
         version: ACCOUNT_VERSION,
         name: account_name.clone(),
         created_at,

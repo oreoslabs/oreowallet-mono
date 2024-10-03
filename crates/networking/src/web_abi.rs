@@ -104,7 +104,7 @@ impl TransactionDetail {
                 memo: Some(memo.into()),
                 value: value.into(),
             }),
-            None => Err(OreoError::InternalRpcError),
+            None => Err(OreoError::InternalRpcError("no note".to_string())),
         }
     }
 }

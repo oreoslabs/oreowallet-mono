@@ -43,11 +43,12 @@ impl RpcHandler {
         request: RpcImportAccountRequest,
     ) -> Result<RpcResponse<RpcImportAccountResponse>, OreoError> {
         let path = format!("http://{}/wallet/importAccount", self.endpoint);
+        let account_str = serde_json::to_string(&request).map_err(|_|OreoError::InternalRpcError("JSON serialization failed".to_string()))?;
         let resp = self
             .agent
             .clone()
             .post(&path)
-            .send_json(ureq::json!({"account": request}));
+            .send_json(ureq::json!({"account": account_str}));
         handle_response(resp)
     }
 
@@ -193,7 +194,7 @@ impl RpcHandler {
             .agent
             .clone()
             .post(&path)
-            .send_json(RpcGetBlocksRequest { start, end });
+            .send_json(RpcGetBlocksRequest { start, end, serialized: true });
         handle_response(resp)
     }
 

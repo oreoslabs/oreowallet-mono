@@ -10,7 +10,7 @@ use utils::{handle_signals, initialize_logger};
 #[derive(Parser, Debug, Clone)]
 pub struct Command {
     /// The ip:port server will listen on for restful api
-    #[clap(long, default_value = "0.0.0.0:10001")]
+    #[clap(long, default_value = "0.0.0.0:9093")]
     pub listen: SocketAddr,
     /// The path to db config file
     #[clap(long)]
@@ -22,7 +22,7 @@ pub struct Command {
     #[clap(short, long, default_value = "127.0.0.1:9092")]
     pub node: String,
     /// The scan server to connect to
-    #[clap(long, default_value = "127.0.0.1:9093")]
+    #[clap(long, default_value = "127.0.0.1:10001")]
     pub scan: String,
 }
 
