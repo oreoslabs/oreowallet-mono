@@ -10,7 +10,7 @@ use utils::{handle_signals, initialize_logger};
 #[command(version, about)]
 struct Cli {
     /// scheduler to connect to
-    #[arg(short, long)]
+    #[clap(short, long)]
     address: SocketAddr,
     /// worker name
     #[arg(short, long)]
