@@ -4,6 +4,9 @@ FROM rust:latest AS builder
 # Set the working directory
 WORKDIR /app
 
+# Install sqlx-cli
+RUN cargo install sqlx-cli
+
 # Copy the entire workspace
 COPY . .
 
@@ -26,6 +29,10 @@ COPY --from=builder /app/target/release/chain_loader /app/chain_loader
 COPY --from=builder /app/target/release/dservice /app/dservice
 COPY --from=builder /app/target/release/dworker /app/dworker
 COPY --from=builder /app/target/release/prover /app/prover
+
+# Copy the sqlx binary from the builder stage
+COPY --from=builder /usr/local/cargo/bin/sqlx /app/sqlx
+COPY migrations /app/migrations
 
 
 # Expose necessary ports
