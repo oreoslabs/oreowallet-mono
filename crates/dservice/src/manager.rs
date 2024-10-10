@@ -244,7 +244,7 @@ impl Manager {
                 if let Some(task_info) = self.task_mapping.read().await.get(&task_id) {
                     let block_hash = task_info.hash.to_string();
                     if !response.data.is_empty() {
-                        info!("account info: {:?}", account);
+                        debug!("account info: {:?}", account);
                         info!("new available block {} for account {}", block_hash, address);
                         account.blocks.insert(
                             block_hash,

@@ -3,7 +3,7 @@ use std::{fmt::Debug, time::Duration};
 use oreo_errors::OreoError;
 use serde::Deserialize;
 use serde_json::json;
-use tracing::debug;
+use tracing::{debug, info};
 use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::{
@@ -144,7 +144,26 @@ impl RpcHandler {
     ) -> Result<RpcResponse<RpcGetTransactionsResponse>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
-        handle_response(resp)
+    
+        match resp {
+            Ok(response) => {
+                let mut buffer = Vec::new();
+                response.into_reader().read_to_end(&mut buffer).map_err(|e| OreoError::InternalRpcError(e.to_string()))?;
+                let transactions_response: RpcResponse<RpcGetTransactionsResponse> = if buffer.is_empty() {
+                    RpcResponse {
+                        data: RpcGetTransactionsResponse {
+                            transactions: Vec::new(),
+                        },
+                        status: 200,
+                    }
+                } else {
+                    serde_json::from_slice(&buffer)
+                        .map_err(|e| OreoError::InternalRpcError(e.to_string()))?
+                };
+                Ok(transactions_response)
+            }
+            Err(e) => handle_response(Err(e)),
+        }
     }
 
     pub fn create_transaction(
@@ -211,6 +230,7 @@ impl RpcHandler {
 pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
     resp: Result<Response, Error>,
 ) -> Result<RpcResponse<S>, OreoError> {
+    info!("Handle response: {:?}", resp);
     let res = match resp {
         Ok(response) => match response.into_json::<RpcResponse<S>>() {
             Ok(data) => Ok(data),

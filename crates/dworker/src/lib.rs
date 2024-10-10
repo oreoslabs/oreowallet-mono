@@ -131,7 +131,7 @@ pub async fn handle_connection(
         while let Some(Ok(message)) = socket_r_handler.next().await {
             match message {
                 DMessage::DRequest(request) => {
-                    info!("new task from scheduler: {}", request.id.clone());
+                    debug!("new task from scheduler: {}", request.id.clone());
                     let response = decrypt(worker_pool.clone(), request).await;
                     if let Err(e) = task_tx.send(DMessage::DResponse(response)).await {
                         error!("failed to send response to write channel, {}", e);

@@ -5,20 +5,19 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use constants::{ACCOUNT_VERSION, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
+use constants::{ACCOUNT_VERSION, MAINNET_GENESIS_SEQUENCE};
 use db_handler::DBHandler;
 use networking::{
-    decryption_message::{DecryptionMessage, ScanRequest, ScanResponse, SuccessResponse},
-    rpc_abi::{
+    decryption_message::{DecryptionMessage, ScanRequest, ScanResponse, SuccessResponse}, rpc_abi::{
         BlockInfo, OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
         RpcGetTransactionsRequest, RpcImportAccountRequest, RpcImportAccountResponse,
         RpcRemoveAccountRequest, RpcResetAccountRequest, RpcResponse, RpcSetScanningRequest,
-    },
-    web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
+    }, web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse}
 };
 use oreo_errors::OreoError;
 use serde_json::json;
+use tracing::info;
 use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;
@@ -29,7 +28,7 @@ pub async fn import_account_handler<T: DBHandler>(
 ) -> impl IntoResponse {
     let account_name = shared
         .db_handler
-        .save_account(import.clone().to_account(), 0)
+        .save_account(import.clone().to_account(shared.genesis_hash.clone()), 0)
         .await;
     if let Err(e) = account_name {
         return e.into_response();
@@ -67,7 +66,10 @@ pub async fn import_account_handler<T: DBHandler>(
                     account: account_name.clone(),
                 })
                 .map(|x| {
-                    let head = x.data.account.head.unwrap_or(BlockInfo::default());
+                    let head = x.data.account.head.unwrap_or(BlockInfo {
+                        hash: shared.genesis_hash.clone(),
+                        sequence: MAINNET_GENESIS_SEQUENCE as u64,
+                    });
                     if latest_height - head.sequence > 1000 {
                         let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                             account: account_name.clone(),
@@ -156,7 +158,7 @@ pub async fn account_status_handler<T: DBHandler>(
                 Some(_) => {}
                 None => {
                     result.data.account.head = Some(BlockInfo {
-                        hash: MAINNET_GENESIS_HASH.to_string(),
+                        hash: shared.genesis_hash.clone(),
                         sequence: MAINNET_GENESIS_SEQUENCE as u64,
                     })
                 }
@@ -196,7 +198,10 @@ pub async fn rescan_account_handler<T: DBHandler>(
             account: account.name.clone(),
         })
     {
-        let head = status.data.account.head.unwrap_or(BlockInfo::default());
+        let head = status.data.account.head.unwrap_or(BlockInfo {
+            hash: shared.genesis_hash.clone(),
+            sequence: MAINNET_GENESIS_SEQUENCE as u64,
+        });
         let scan_request = ScanRequest {
             address: account.address.clone(),
             in_vk: account.in_vk.clone(),
@@ -243,7 +248,11 @@ pub async fn update_scan_status_handler<T: DBHandler>(
             }
             let account = db_account.unwrap();
             message.account = account.name.clone();
-            let _ = shared.rpc_handler.set_account_head(message);
+            info!("set account message: {:?}", message.clone());
+            let resp = shared.rpc_handler.set_account_head(message);
+            if resp.is_err() {
+                info!("Failed to update account head: {:?}", resp.unwrap_err());
+            }
             let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                 account: account.name.clone(),
                 enabled: true,
