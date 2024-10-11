@@ -32,6 +32,7 @@ services:
       retries: 5
 
   migration:
+    build: .
     image: "oreowallet"
     command: /bin/sh -c "./sqlx database create && ./sqlx migrate run"
     environment:
@@ -48,6 +49,7 @@ services:
             max-size: "25m"
 
   chainloader:
+    build: .
     restart: always
     image: "oreowallet"
     command: ./chain_loader --dbconfig /app/conf/dbconfig --node ${NODE_HOST}:${NODE_PORT} --verbosity ${VERBOSITY:-0}
@@ -68,6 +70,7 @@ services:
             max-size: "25m"
 
   prover:
+    build: .
     restart: always
     image: "oreowallet"
     command: ./prover --verbosity ${VERBOSITY:-0}
@@ -89,6 +92,7 @@ services:
             max-size: "25m"
 
   server:
+    build: .
     restart: always
     image: "oreowallet"
     environment:
@@ -116,6 +120,7 @@ services:
             max-size: "25m"
 
   dservice:
+    build: .
     restart: always
     image: "oreowallet"
     environment:
@@ -144,6 +149,7 @@ services:
             max-size: "25m"
 
   dworker:
+    build: .
     restart: always
     image: "oreowallet"
     command: ./dworker --address 172.19.0.10:10001 --verbosity ${VERBOSITY:-0}
