@@ -1,0 +1,180 @@
+version: '2.4'
+services:
+  dbconfig:
+    image: alpine:latest
+    volumes:
+      - conf:/app/conf  # Mount the config directory on the host to the container
+    command: |
+      /bin/sh -c "echo 'host: postgres
+      port: 5432
+      user: ${DB_USER}
+      password: ${DB_PASSWORD}
+      dbname: oreowallet
+      default_pool_size: 200
+      protocol: \"postgres\"' > /app/conf/dbconfig"
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: oreowallet
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - oreowallet_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migration:
+    build: .
+    image: "oreowallet"
+    command: /bin/sh -c "./sqlx database create && ./sqlx migrate run"
+    environment:
+      - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/oreowallet
+    networks:
+      - oreowallet_network
+    depends_on:
+      - postgres
+      - dbconfig
+    logging:
+        driver: "json-file"
+        options:
+            max-file: "4"
+            max-size: "25m"
+
+  chainloader:
+    build: .
+    restart: always
+    image: "oreowallet"
+    command: ./chain_loader --dbconfig /app/conf/dbconfig --node ${NODE_HOST}:${NODE_PORT} --verbosity ${VERBOSITY:-0}
+    volumes:
+       - conf:/app/conf
+    depends_on:
+      - migration
+    networks:
+      - oreowallet_network
+    ulimits:
+      core:
+        hard: 0
+        soft: 0
+    logging:
+        driver: "json-file"
+        options:
+            max-file: "4"
+            max-size: "25m"
+
+  prover:
+    build: .
+    restart: always
+    image: "oreowallet"
+    command: ./prover --verbosity ${VERBOSITY:-0}
+    ports:
+      - "10002:10002"
+    depends_on:
+      - migration
+      - chainloader
+    networks:
+      - oreowallet_network
+    ulimits:
+      core:
+        hard: 0
+        soft: 0
+    logging:
+        driver: "json-file"
+        options:
+            max-file: "4"
+            max-size: "25m"
+
+  server:
+    build: .
+    restart: always
+    image: "oreowallet"
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - PUBLIC_KEY=${PUBLIC_KEY}
+    command: |
+      ./server --listen 0.0.0.0:${SERVER_PORT} --dbconfig /app/conf/dbconfig --node ${NODE_HOST}:${NODE_PORT} --scan dservice:20001 --verbosity ${VERBOSITY:-0}
+    ports:
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    volumes:
+      - conf:/app/conf
+    depends_on:
+      - migration
+      - chainloader
+    networks:
+      - oreowallet_network
+    ulimits:
+      core:
+        hard: 0
+        soft: 0
+    logging:
+        driver: "json-file"
+        options:
+            max-file: "4"
+            max-size: "25m"
+
+  dservice:
+    build: .
+    restart: always
+    image: "oreowallet"
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - PUBLIC_KEY=${PUBLIC_KEY}
+    command: ./dservice --dbconfig /app/conf/dbconfig --node ${NODE_HOST}:${NODE_PORT} --server server:${SERVER_PORT} --verbosity ${VERBOSITY:-0}
+    ports:
+      - "10001:10001"
+      - "20001:20001"
+    volumes:
+      - conf:/app/conf
+    depends_on:
+      - migration
+      - chainloader
+    networks:
+      oreowallet_network:
+        ipv4_address: 172.19.0.10
+    ulimits:
+      core:
+        hard: 0
+        soft: 0
+    logging:
+        driver: "json-file"
+        options:
+            max-file: "4"
+            max-size: "25m"
+
+  dworker:
+    build: .
+    restart: always
+    image: "oreowallet"
+    command: ./dworker --address 172.19.0.10:10001 --verbosity ${VERBOSITY:-0}
+    depends_on:
+      - migration
+      - chainloader
+    networks:
+      - oreowallet_network
+    ulimits:
+      core:
+        hard: 0
+        soft: 0
+    logging:
+        driver: "json-file"
+        options:
+            max-file: "4"
+            max-size: "25m"
+
+networks:
+  oreowallet_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16
+
+volumes:
+  postgres_data:
+  conf:
