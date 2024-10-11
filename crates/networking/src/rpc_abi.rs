@@ -1,7 +1,7 @@
 use axum::{response::IntoResponse, Json};
 use constants::IRON_NATIVE_ASSET;
-use serde::{Deserialize, Serialize};
-use ureq::json;
+use serde::{ Deserialize, Serialize};
+use ureq::{json};
 
 use crate::orescriptions::{get_ores, is_ores_local, Ores};
 
@@ -10,6 +10,14 @@ pub struct RpcResponse<T> {
     pub status: u16,
     pub data: T,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcResponseStream<T> {
+    pub data: T
+}
+
+
+
 
 impl<T: Serialize> IntoResponse for RpcResponse<T> {
     fn into_response(self) -> axum::response::Response {

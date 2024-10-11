@@ -21,7 +21,13 @@ A tool to fetch blocks from rpc and save in local db for better performance duri
 
 ![basic arch](assets/arch_v2.png)
 
-## Docker Local Development
+## Docker
+
+Build
+
+```bash
+docker build -t oreowallet .
+```
 
 Run node:
 

@@ -8,17 +8,9 @@ use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::{
     rpc_abi::{
-        RpcBroadcastTxRequest, RpcBroadcastTxResponse, RpcCreateTxRequest, RpcCreateTxResponse,
-        RpcExportAccountResponse, RpcGetAccountStatusRequest, RpcGetAccountStatusResponse,
-        RpcGetAccountTransactionRequest, RpcGetAccountTransactionResponse, RpcGetBalancesRequest,
-        RpcGetBalancesResponse, RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest,
-        RpcGetBlocksResponse, RpcGetLatestBlockResponse, RpcGetTransactionsRequest,
-        RpcGetTransactionsResponse, RpcImportAccountRequest, RpcImportAccountResponse,
-        RpcRemoveAccountRequest, RpcRemoveAccountResponse, RpcResetAccountRequest, RpcResponse,
-        RpcSetAccountHeadRequest, RpcSetScanningRequest, SendTransactionRequest,
-        SendTransactionResponse,
+        RpcBroadcastTxRequest, RpcBroadcastTxResponse, RpcCreateTxRequest, RpcCreateTxResponse, RpcExportAccountResponse, RpcGetAccountStatusRequest, RpcGetAccountStatusResponse, RpcGetAccountTransactionRequest, RpcGetAccountTransactionResponse, RpcGetBalancesRequest, RpcGetBalancesResponse, RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest, RpcGetBlocksResponse, RpcGetLatestBlockResponse, RpcGetTransactionsRequest, RpcGetTransactionsResponse, RpcImportAccountRequest, RpcImportAccountResponse, RpcRemoveAccountRequest, RpcRemoveAccountResponse, RpcResetAccountRequest, RpcResponse, RpcSetAccountHeadRequest, RpcSetScanningRequest, SendTransactionRequest, SendTransactionResponse
     },
-    rpc_handler::RpcError,
+    rpc_handler::RpcError, stream::RequestExt,
 };
 
 #[derive(Debug, Clone)]
@@ -137,32 +129,24 @@ impl RpcHandler {
         let resp = self.agent.clone().post(&path).send_json(&request);
         handle_response(resp)
     }
-
+    
     pub fn get_transactions(
         &self,
         request: RpcGetTransactionsRequest,
     ) -> Result<RpcResponse<RpcGetTransactionsResponse>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
-    
         match resp {
             Ok(response) => {
-                let mut buffer = Vec::new();
-                response.into_reader().read_to_end(&mut buffer).map_err(|e| OreoError::InternalRpcError(e.to_string()))?;
-                let transactions_response: RpcResponse<RpcGetTransactionsResponse> = if buffer.is_empty() {
-                    RpcResponse {
-                        data: RpcGetTransactionsResponse {
-                            transactions: Vec::new(),
-                        },
-                        status: 200,
-                    }
-                } else {
-                    serde_json::from_slice(&buffer)
-                        .map_err(|e| OreoError::InternalRpcError(e.to_string()))?
-                };
-                Ok(transactions_response)
-            }
-            Err(e) => handle_response(Err(e)),
+                let transactions = response.collect_stream();
+                Ok(RpcResponse {
+                    status: 200,
+                    data: RpcGetTransactionsResponse {
+                        transactions: transactions?,
+                    },
+                })
+            },
+            Err(e) => Err(OreoError::InternalRpcError(e.to_string())),
         }
     }
 
