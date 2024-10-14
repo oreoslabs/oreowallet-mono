@@ -1,11 +1,11 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{env, net::SocketAddr, sync::Arc, time::Duration};
+use axum_extra::{headers::{authorization::Basic, Authorization}, TypedHeader};
+use sha2::{Sha256, Digest};
+use std::str;
 
 use anyhow::Result;
 use axum::{
-    error_handling::HandleErrorLayer,
-    http::StatusCode,
-    routing::{get, post},
-    BoxError, Router,
+    body::Body, error_handling::HandleErrorLayer, extract::State, http::{Request, StatusCode}, middleware::{from_fn_with_state,  Next}, response::IntoResponse, routing::{get, post}, BoxError, Router
 };
 use db_handler::{DBHandler, PgHandler};
 use networking::{rpc_handler::RpcHandler, server_handler::ServerHandler};
@@ -52,7 +52,33 @@ where
         }
     }
 }
-
+// Authentication middleware function
+pub async fn auth<T: DBHandler>(
+    State(shared_state): State<Arc<SharedState<T>>>,
+    TypedHeader(Authorization(basic)): TypedHeader<Authorization<Basic>>,
+    req: Request<Body>, 
+    next: Next
+) -> impl IntoResponse 
+    where
+    T: DBHandler + Send + Sync + 'static,
+{
+    match shared_state.db_handler.get_account(basic.username().to_string()).await {
+        Ok(account) => {
+            let bytes = hex::decode(account.vk).map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token"))?;
+            let token = Sha256::digest(bytes);
+            let token_hex = hex::encode(token);
+            if token_hex != basic.password() {
+                return Err((StatusCode::UNAUTHORIZED, "Invalid token"));
+            }
+            return Ok(next.run(req).await);
+        }
+        Err(_) => {
+            // Token is invalid
+            return Err((StatusCode::UNAUTHORIZED, "Invalid token"));
+        }
+    }
+}
+  
 pub async fn run_server(
     listen: SocketAddr,
     rpc_server: String,
@@ -78,9 +104,13 @@ pub async fn run_server(
         },
         genesis_hash,
     ));
+    let auth_middleware = from_fn_with_state(shared_resource.clone(), auth);
 
-    let router = Router::new()
+    let no_auth_router = Router::new()
         .route("/import", post(import_account_handler))
+        .with_state(shared_resource.clone());
+
+    let mut auth_router = Router::new()
         .route("/remove", post(remove_account_handler))
         .route("/getBalances", post(get_balances_handler))
         .route("/getTransaction", post(get_transaction_handler))
@@ -93,7 +123,14 @@ pub async fn run_server(
         .route("/rescan", post(rescan_account_handler))
         .route("/healthCheck", get(health_check_handler))
         .route("/updateScan", post(update_scan_status_handler))
-        .with_state(shared_resource.clone())
+        .with_state(shared_resource.clone());
+
+    if env::var("ENABLE_AUTH").unwrap_or_else(|_| "false".to_string()) == "true" {
+        auth_router = auth_router.layer(auth_middleware);
+    }
+        
+    let router = no_auth_router
+        .merge(auth_router)
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(|_: BoxError| async {

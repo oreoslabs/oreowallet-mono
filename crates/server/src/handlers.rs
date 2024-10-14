@@ -17,7 +17,7 @@ use networking::{
 };
 use oreo_errors::OreoError;
 use serde_json::json;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;

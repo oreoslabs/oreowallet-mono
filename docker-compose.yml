@@ -98,6 +98,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - PUBLIC_KEY=${PUBLIC_KEY}
+      - ENABLE_AUTH=${ENABLE_AUTH:-false}
     command: |
       ./server --listen 0.0.0.0:${SERVER_PORT} --dbconfig /app/conf/dbconfig --node ${NODE_HOST}:${NODE_PORT} --scan dservice:20001 --verbosity ${VERBOSITY:-0}
     ports:
