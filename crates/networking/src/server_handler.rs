@@ -49,9 +49,9 @@ fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
     let res = match resp {
         Ok(response) => match response.into_json::<S>() {
             Ok(data) => Ok(data),
-            Err(_) => Err(OreoError::DServerError),
+            Err(err) => Err(OreoError::DServerError(err.to_string())),
         },
-        _ => Err(OreoError::DServerError),
+        Err(err) => Err(OreoError::DServerError(err.to_string())),
     };
     debug!("Handle rpc response: {:?}", res);
     res

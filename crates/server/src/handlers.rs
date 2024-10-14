@@ -17,7 +17,7 @@ use networking::{
 };
 use oreo_errors::OreoError;
 use serde_json::json;
-use tracing::info;
+use tracing::{debug, error, info};
 use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;
@@ -188,10 +188,14 @@ pub async fn rescan_account_handler<T: DBHandler>(
         reset_scanning_enabled: Some(false),
         reset_created_at: Some(false),
     });
-    let _ = shared
+    let update_scan_status = shared
         .db_handler
         .update_scan_status(account.address.clone(), true)
         .await;
+    if let Err(err) = update_scan_status {
+        error!("Failed to update scan status: {:?}", err);
+        return err.into_response();
+    }
     if let Ok(status) = shared
         .rpc_handler
         .get_account_status(RpcGetAccountStatusRequest {
@@ -212,10 +216,14 @@ pub async fn rescan_account_handler<T: DBHandler>(
         let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
             .unwrap()
             .to_string();
-        let _ = shared.scan_handler.submit_scan_request(DecryptionMessage {
+        let scan_request = shared.scan_handler.submit_scan_request(DecryptionMessage {
             message: scan_request,
             signature,
         });
+        if let Err(err) = scan_request {
+            error!("Failed to submit scan request: {:?}", err);
+            return err.into_response();
+        }
     }
     RpcResponse {
         status: 200,

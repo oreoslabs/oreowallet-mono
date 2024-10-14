@@ -38,7 +38,9 @@ pub enum OreoError {
     #[error("Failed to parse data `{0}`")]
     ParseError(String),
     #[error("Decryption server error")]
-    DServerError,
+    DServerError(String),
+    #[error("Account status error: {0}")]
+    AccountStatusError(String),
 }
 
 impl IntoResponse for OreoError {
@@ -66,7 +68,8 @@ impl IntoResponse for OreoError {
             }
             OreoError::SeralizeError(_) => (StatusCode::from_u16(612).unwrap(), self.to_string()),
             OreoError::ParseError(_) => (StatusCode::from_u16(613).unwrap(), self.to_string()),
-            OreoError::DServerError => (StatusCode::from_u16(614).unwrap(), self.to_string()),
+            OreoError::DServerError(_) => (StatusCode::from_u16(614).unwrap(), self.to_string()),
+            OreoError::AccountStatusError(_) => (StatusCode::from_u16(615).unwrap(), self.to_string()),
         };
         Json(json!({"code": status_code.as_u16(), "error": err_msg})).into_response()
     }

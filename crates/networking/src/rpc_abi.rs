@@ -1,7 +1,7 @@
 use axum::{response::IntoResponse, Json};
 use constants::IRON_NATIVE_ASSET;
 use serde::{ Deserialize, Serialize};
-use ureq::{json};
+use ureq::json;
 
 use crate::orescriptions::{get_ores, is_ores_local, Ores};
 
