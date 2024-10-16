@@ -1,4 +1,4 @@
-use constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
+use constants::MAINNET_GENESIS_SEQUENCE;
 use db_handler::{address_to_name, Account};
 use oreo_errors::OreoError;
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ pub struct ImportAccountResponse {
 }
 
 impl ImportAccountRequest {
-    pub fn to_account(&self) -> Account {
+    pub fn to_account(&self, genesis_hash: String) -> Account {
         let (create_head, create_hash) = match &self.created_at {
             Some(creat) => (Some(creat.sequence as i64), Some(creat.hash.clone())),
             None => (None, None),
@@ -34,7 +34,7 @@ impl ImportAccountRequest {
             create_head,
             create_hash: create_hash.clone(),
             head: create_head.unwrap_or(MAINNET_GENESIS_SEQUENCE),
-            hash: create_hash.unwrap_or(MAINNET_GENESIS_HASH.to_string()),
+            hash: create_hash.unwrap_or(genesis_hash),
             in_vk: self.incoming_view_key.clone(),
             out_vk: self.outgoing_view_key.clone(),
             vk: self.view_key.clone(),
