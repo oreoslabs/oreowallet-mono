@@ -50,6 +50,7 @@ where
         }
     }
 }
+
 // Authentication middleware function
 pub async fn auth<T: DBHandler>(
     State(shared_state): State<Arc<SharedState<T>>>,
