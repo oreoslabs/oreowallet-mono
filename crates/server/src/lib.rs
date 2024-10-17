@@ -116,7 +116,6 @@ pub async fn run_server(
         .route("/updateScan", post(update_scan_status_handler))
         .with_state(shared_resource.clone());
 
-    // TODO: remove this once auth is enabled and running for a while
     if env::var("ENABLE_AUTH").unwrap_or_else(|_| "false".to_string()) == "true" {
         auth_router = auth_router.layer(auth_middleware);
     }
