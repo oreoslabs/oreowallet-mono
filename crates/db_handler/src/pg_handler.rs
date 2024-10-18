@@ -20,7 +20,7 @@ impl PgHandler {
 
     pub async fn insert(&self, account: Account) -> Result<String, sqlx::Error> {
         let result = sqlx::query(
-            "INSERT INTO wallet.account (name, create_head, create_hash, head, hash, in_vk, out_vk, vk, address, token) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, encode(digest($8, 'sha256'), 'hex')) RETURNING name"
+            "INSERT INTO wallet.account (name, create_head, create_hash, head, hash, in_vk, out_vk, vk, address) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING name"
         )
         .bind(account.name.clone())
         .bind(account.create_head.clone())
