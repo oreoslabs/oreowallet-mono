@@ -1,6 +1,7 @@
 use std::{
     cmp::Reverse,
     collections::HashMap,
+    net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -19,7 +20,7 @@ use priority_queue::PriorityQueue;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::split,
-    net::TcpStream,
+    net::{TcpListener, TcpStream},
     sync::{
         mpsc::{self, Sender},
         oneshot, RwLock,
@@ -139,25 +140,41 @@ impl Manager {
         })
     }
 
-    pub async fn handle_stream(stream: TcpStream, server: Arc<Self>) -> Result<()> {
+    pub async fn initialize_networking(server: Arc<Self>, addr: SocketAddr) -> Result<()> {
+        let (router, handler) = oneshot::channel();
+        let listener = TcpListener::bind(&addr).await?;
+        tokio::spawn(async move {
+            let _ = router.send(());
+            loop {
+                match listener.accept().await {
+                    Ok((stream, ip)) => {
+                        debug!("new connection from {}", ip);
+                        let _ = Self::handle_stream(stream, server.clone(), ip.to_string()).await;
+                    }
+                    Err(e) => error!("failed to accept connection, {:?}", e),
+                }
+            }
+        });
+        let _ = handler.await;
+        Ok(())
+    }
+
+    pub async fn handle_stream(stream: TcpStream, server: Arc<Self>, worker: String) -> Result<()> {
         let (tx, mut rx) = mpsc::channel::<ServerMessage>(1024);
-        let mut worker_name = stream.peer_addr().unwrap().clone().to_string();
+        let mut worker_name = worker;
         let (r, w) = split(stream);
         let mut outbound_w = FramedWrite::new(w, DMessageCodec::default());
         let mut outbound_r = FramedRead::new(r, DMessageCodec::default());
-        let (router, handler) = oneshot::channel();
-        let mut timer = tokio::time::interval(Duration::from_secs(300));
-        let _ = timer.tick().await;
 
         let worker_server = server.clone();
-
-        let worker_server_clone = worker_server.clone();
-        let _out_message_handler = tokio::spawn(async move {
+        let (router, handler) = oneshot::channel();
+        tokio::spawn(async move {
+            let _ = router.send(());
             while let Some(message) = rx.recv().await {
                 let ServerMessage { name, request } = message;
                 match name {
                     Some(name) => {
-                        let _ = worker_server_clone
+                        let _ = worker_server
                             .workers
                             .write()
                             .await
@@ -173,8 +190,13 @@ impl Manager {
                 }
             }
         });
+        let _ = handler.await;
 
-        let _in_message_handler = tokio::spawn(async move {
+        let mut timer = tokio::time::interval(Duration::from_secs(300));
+        let _ = timer.tick().await;
+        let (router, handler) = oneshot::channel();
+        let worker_server = server.clone();
+        tokio::spawn(async move {
             let _ = router.send(());
             loop {
                 tokio::select! {
@@ -198,7 +220,8 @@ impl Manager {
                                                 worker_name = register.name;
                                                 info!("new worker: {}", worker_name.clone());
                                                 let _ = worker_server.workers.write().await.insert(worker_name.clone(), worker);
-                                                match worker_server.task_queue.write().await.pop() {
+                                                let data = worker_server.task_queue.write().await.pop();
+                                                match data {
                                                     Some((task, _)) => {
                                                         let _ = tx.send(ServerMessage { name: Some(worker_name.clone()), request: task }).await.unwrap();
                                                     },
@@ -207,10 +230,15 @@ impl Manager {
                                             }
                                         }
                                     },
-                                    DMessage::DRequest(_) => error!("invalid message from worker, should never happen"),
+                                    DMessage::DRequest(_) => {
+                                        error!("invalid message from worker, should never happen");
+                                        let _ = worker_server.workers.write().await.remove(&worker_name).unwrap();
+                                        break;
+                                    },
                                     DMessage::DResponse(response) => {
                                         debug!("new response from worker {}", response.id);
-                                        match worker_server.task_queue.write().await.pop() {
+                                        let data = worker_server.task_queue.write().await.pop();
+                                        match data {
                                             Some((task, _)) => {
                                                 let _ = tx.send(ServerMessage { name: None, request: task }).await.unwrap();
                                             },

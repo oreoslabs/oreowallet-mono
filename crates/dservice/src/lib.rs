@@ -117,31 +117,15 @@ pub async fn run_dserver(
     };
     let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server, &server, secp_key));
     let manager = Manager::new(shared_resource);
-    let listener = TcpListener::bind(&dlisten).await.unwrap();
 
-    // dworker handler
-    let (router, handler) = oneshot::channel();
-    let dworker_manager = manager.clone();
-    let dworker_handler = tokio::spawn(async move {
-        let _ = router.send(());
-        loop {
-            match listener.accept().await {
-                Ok((stream, ip)) => {
-                    debug!("new connection from {}", ip);
-                    if let Err(e) = Manager::handle_stream(stream, dworker_manager.clone()).await {
-                        error!("failed to handle stream, {e}");
-                    }
-                }
-                Err(e) => error!("failed to accept connection, {:?}", e),
-            }
-        }
-    });
-    let _ = handler.await;
+    if let Err(e) = Manager::initialize_networking(manager.clone(), dlisten).await {
+        error!("init networking server {}", e);
+    }
 
     // manager status updater
     let status_manager = manager.clone();
     let (router, handler) = oneshot::channel();
-    let status_update_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = router.send(());
         loop {
             {
@@ -171,7 +155,7 @@ pub async fn run_dserver(
     // primary task scheduling
     let schduler = manager.clone();
     let (router, handler) = oneshot::channel();
-    let scheduling_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = router.send(());
         loop {
             sleep(RESCHEDULING_DURATION).await;
@@ -266,7 +250,7 @@ pub async fn run_dserver(
     // secondary task scheduling
     let secondary = manager.clone();
     let (router, handler) = oneshot::channel();
-    let secondary_scheduling_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = router.send(());
         loop {
             for key in secondary
@@ -310,19 +294,12 @@ pub async fn run_dserver(
     let _ = handler.await;
 
     let (router, handler) = oneshot::channel();
-    let restful_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = router.send(());
         let _ = start_rest(manager.clone(), restful).await;
     });
     let _ = handler.await;
 
-    let _ = tokio::join!(
-        dworker_handler,
-        status_update_handler,
-        scheduling_handler,
-        secondary_scheduling_handler,
-        restful_handler,
-    );
     std::future::pending::<()>().await;
     Ok(())
 }
