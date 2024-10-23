@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
+use anyhow::anyhow;
 use futures::{SinkExt, StreamExt};
 use ironfish_rust::{IncomingViewKey, MerkleNote, OutgoingViewKey};
 use networking::socket_message::codec::{
@@ -8,6 +9,7 @@ use networking::socket_message::codec::{
 };
 use rayon::prelude::*;
 use rayon::{iter::IntoParallelIterator, ThreadPool};
+use tokio::time::timeout;
 use tokio::{
     io::split,
     net::TcpStream,
@@ -97,7 +99,7 @@ pub async fn handle_connection(
 
     // send to scheduler loop
     let (router, handler) = oneshot::channel();
-    let send_task_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = router.send(());
         while let Some(message) = rx.recv().await {
             debug!("write message to scheduler {:?}", message);
@@ -126,7 +128,7 @@ pub async fn handle_connection(
     // receive task handler loop
     let task_tx = tx.clone();
     let (router, handler) = oneshot::channel();
-    let receive_task_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = router.send(());
         while let Some(Ok(message)) = socket_r_handler.next().await {
             match message {
@@ -148,7 +150,7 @@ pub async fn handle_connection(
 
     let heart_beat_tx = tx.clone();
     let (router, handler) = oneshot::channel();
-    let heart_beat_handler = tokio::spawn(async move {
+    tokio::spawn(async move {
         let _ = router.send(());
         loop {
             let _ = heart_beat_tx
@@ -161,8 +163,14 @@ pub async fn handle_connection(
         }
     });
     let _ = handler.await;
-    let _ = tokio::join!(send_task_handler, receive_task_handler, heart_beat_handler);
     Ok(())
+}
+
+pub async fn reconnect_tcp(addr: SocketAddr) -> anyhow::Result<TcpStream> {
+    match timeout(Duration::from_secs(3), TcpStream::connect(addr)).await {
+        Ok(Ok(stream)) => Ok(stream),
+        _ => Err(anyhow!("failed to connect to dservice")),
+    }
 }
 
 pub async fn start_worker(addr: SocketAddr, name: String) -> anyhow::Result<()> {
@@ -175,18 +183,20 @@ pub async fn start_worker(addr: SocketAddr, name: String) -> anyhow::Result<()> 
     tokio::spawn(async move {
         let _ = router.send(());
         loop {
-            match TcpStream::connect(&addr).await {
-                Ok(stream) => {
-                    if let Err(e) = handle_connection(worker.clone(), stream, name.clone()).await {
-                        error!("connection to scheduler interrupted: {:?}", e);
-                    }
-                    error!("handle_connection exited");
-                    sleep(Duration::from_secs(10)).await;
+            let stream = loop {
+                if let Ok(stream) = reconnect_tcp(addr.clone()).await {
+                    break stream;
                 }
-                Err(e) => {
-                    error!("failed to connect to scheduler, try again, {:?}", e);
-                    sleep(Duration::from_secs(10)).await;
-                }
+                error!("can't connect to dservice, reconnect after 30 seconds");
+                sleep(Duration::from_secs(30)).await;
+            };
+
+            if handle_connection(worker.clone(), stream, name.clone())
+                .await
+                .is_err()
+            {
+                error!("failed to init networking");
+                break;
             }
         }
     });
