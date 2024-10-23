@@ -3,6 +3,7 @@ use std::{net::SocketAddr, time::Duration};
 use axum::{
     error_handling::HandleErrorLayer,
     http::StatusCode,
+    response::IntoResponse,
     routing::{get, post},
     BoxError, Router,
 };
@@ -33,7 +34,12 @@ pub async fn run_prover(listen: SocketAddr) -> anyhow::Result<()> {
                 .allow_headers(Any),
         );
     let listener = TcpListener::bind(&listen).await?;
+    let app = router.fallback(handler_404);
     info!("Prover listening on {}", listen);
-    axum::serve(listener, router).await?;
+    axum::serve(listener, app).await?;
     Ok(())
+}
+
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "Not Found")
 }
