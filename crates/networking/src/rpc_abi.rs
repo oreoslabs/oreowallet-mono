@@ -1,6 +1,6 @@
 use axum::{response::IntoResponse, Json};
-use constants::{IRON_NATIVE_ASSET, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
-use serde::{Deserialize, Serialize};
+use constants::IRON_NATIVE_ASSET;
+use serde::{ Deserialize, Serialize};
 use ureq::json;
 
 use crate::orescriptions::{get_ores, is_ores_local, Ores};
@@ -10,6 +10,14 @@ pub struct RpcResponse<T> {
     pub status: u16,
     pub data: T,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcResponseStream<T> {
+    pub data: T
+}
+
+
+
 
 impl<T: Serialize> IntoResponse for RpcResponse<T> {
     fn into_response(self) -> axum::response::Response {
@@ -23,21 +31,13 @@ pub struct BlockInfo {
     pub sequence: u64,
 }
 
-impl Default for BlockInfo {
-    fn default() -> Self {
-        Self {
-            hash: MAINNET_GENESIS_HASH.to_string(),
-            sequence: MAINNET_GENESIS_SEQUENCE as u64,
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcImportAccountRequest {
     pub version: u8,
     pub name: String,
     pub view_key: String,
+    pub spending_key: Option<String>,
     pub incoming_view_key: String,
     pub outgoing_view_key: String,
     pub public_address: String,
@@ -99,7 +99,7 @@ pub struct BlockWithHash {
     pub transactions: Vec<TransactionWithHash>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RpcSetAccountHeadRequest {
     pub account: String,
     pub start: String,
@@ -327,6 +327,7 @@ pub struct BlockIdentifier {
 #[serde(rename_all = "camelCase")]
 pub struct RpcGetLatestBlockResponse {
     pub current_block_identifier: BlockIdentifier,
+    pub genesis_block_identifier: BlockIdentifier,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -359,6 +360,7 @@ pub struct RpcGetBlockResponse {
 pub struct RpcGetBlocksRequest {
     pub start: u64,
     pub end: u64,
+    pub serialized: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

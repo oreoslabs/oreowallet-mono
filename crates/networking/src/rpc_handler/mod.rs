@@ -22,7 +22,7 @@ impl TryFrom<RpcError> for OreoError {
                 // Should never happen
                 return Ok(OreoError::Duplicate("0x00".to_string()));
             }
-            _ => Ok(OreoError::InternalRpcError),
+            _ => Ok(OreoError::InternalRpcError(value.message)),
         }
     }
 }

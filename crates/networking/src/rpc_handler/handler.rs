@@ -3,22 +3,14 @@ use std::{fmt::Debug, time::Duration};
 use oreo_errors::OreoError;
 use serde::Deserialize;
 use serde_json::json;
-use tracing::debug;
+use tracing::{debug, info};
 use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::{
     rpc_abi::{
-        RpcBroadcastTxRequest, RpcBroadcastTxResponse, RpcCreateTxRequest, RpcCreateTxResponse,
-        RpcExportAccountResponse, RpcGetAccountStatusRequest, RpcGetAccountStatusResponse,
-        RpcGetAccountTransactionRequest, RpcGetAccountTransactionResponse, RpcGetBalancesRequest,
-        RpcGetBalancesResponse, RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest,
-        RpcGetBlocksResponse, RpcGetLatestBlockResponse, RpcGetTransactionsRequest,
-        RpcGetTransactionsResponse, RpcImportAccountRequest, RpcImportAccountResponse,
-        RpcRemoveAccountRequest, RpcRemoveAccountResponse, RpcResetAccountRequest, RpcResponse,
-        RpcSetAccountHeadRequest, RpcSetScanningRequest, SendTransactionRequest,
-        SendTransactionResponse,
+        RpcBroadcastTxRequest, RpcBroadcastTxResponse, RpcCreateTxRequest, RpcCreateTxResponse, RpcExportAccountResponse, RpcGetAccountStatusRequest, RpcGetAccountStatusResponse, RpcGetAccountTransactionRequest, RpcGetAccountTransactionResponse, RpcGetBalancesRequest, RpcGetBalancesResponse, RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest, RpcGetBlocksResponse, RpcGetLatestBlockResponse, RpcGetTransactionsRequest, RpcGetTransactionsResponse, RpcImportAccountRequest, RpcImportAccountResponse, RpcRemoveAccountRequest, RpcRemoveAccountResponse, RpcResetAccountRequest, RpcResponse, RpcSetAccountHeadRequest, RpcSetScanningRequest, SendTransactionRequest, SendTransactionResponse, TransactionStatus
     },
-    rpc_handler::RpcError,
+    rpc_handler::RpcError, stream::RequestExt,
 };
 
 #[derive(Debug, Clone)]
@@ -43,11 +35,12 @@ impl RpcHandler {
         request: RpcImportAccountRequest,
     ) -> Result<RpcResponse<RpcImportAccountResponse>, OreoError> {
         let path = format!("http://{}/wallet/importAccount", self.endpoint);
+        let account_str = serde_json::to_string(&request).map_err(|_|OreoError::InternalRpcError("JSON serialization failed".to_string()))?;
         let resp = self
             .agent
             .clone()
             .post(&path)
-            .send_json(ureq::json!({"account": request}));
+            .send_json(ureq::json!({"account": account_str}));
         handle_response(resp)
     }
 
@@ -136,14 +129,29 @@ impl RpcHandler {
         let resp = self.agent.clone().post(&path).send_json(&request);
         handle_response(resp)
     }
-
+    
     pub fn get_transactions(
         &self,
         request: RpcGetTransactionsRequest,
     ) -> Result<RpcResponse<RpcGetTransactionsResponse>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
-        handle_response(resp)
+    
+        match resp {
+            Ok(response) => {
+                let transactions: Result<Vec<_>, OreoError> = response
+                    .into_stream::<TransactionStatus>()
+                    .collect();
+    
+                Ok(RpcResponse {
+                    status: 200,
+                    data: RpcGetTransactionsResponse {
+                        transactions: transactions?,
+                    },
+                })
+            }
+            Err(e) => Err(OreoError::InternalRpcError(e.to_string())),
+        }
     }
 
     pub fn create_transaction(
@@ -193,7 +201,7 @@ impl RpcHandler {
             .agent
             .clone()
             .post(&path)
-            .send_json(RpcGetBlocksRequest { start, end });
+            .send_json(RpcGetBlocksRequest { start, end, serialized: true });
         handle_response(resp)
     }
 
@@ -210,6 +218,7 @@ impl RpcHandler {
 pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
     resp: Result<Response, Error>,
 ) -> Result<RpcResponse<S>, OreoError> {
+    info!("Handle response: {:?}", resp);
     let res = match resp {
         Ok(response) => match response.into_json::<RpcResponse<S>>() {
             Ok(data) => Ok(data),
