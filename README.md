@@ -20,3 +20,31 @@ A tool to fetch blocks from rpc and save in local db for better performance duri
 ## 2. Guide-level explanation
 
 ![basic arch](assets/arch_v2.png)
+
+## Docker
+
+Build
+
+```bash
+docker build -t oreowallet .
+```
+
+Run node:
+
+```bash
+ironfish start -d ~/.ironfish-testnet --rpc.http --rpc.http.port 9092 --rpc.http.host 0.0.0.0
+```
+
+Run
+
+```bash
+DB_USER=postgres \
+DB_PASSWORD=postgres \
+DB_PORT=5444 \
+NODE_HOST=host.docker.internal \
+NODE_PORT=9092 \
+SECRET_KEY=a0882c5ac5e2fa771dde52b2d5639734a4411df14f4748c6f991a96e5dd9f997 \
+PUBLIC_KEY=03221b2a0ebd9d6798aadee2861a5307ced1a33d143f34c571a98ab4fa534b7d3e \
+SERVER_PORT=8080 \
+docker-compose up
+```
