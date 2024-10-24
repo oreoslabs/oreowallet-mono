@@ -19,8 +19,8 @@ constants = { path = "../constants" }
 oreo_errors = { path = "../oreo_errors" }
 db_handler = { path = "../db_handler" }
 networking = { path = "../networking" }
-ironfish_rust = { package = "ironfish", git = "https://github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm" }
-ironfish_zkp = { package = "ironfish_zkp", git = "https://github.com/oreoslabs/ironfish-optimize.git", branch = "feature/support-wasm" }
+ironfish_rust = { package = "ironfish", git = "https://github.com/iron-fish/ironfish.git", branch = "staging" }
+ironfish_zkp = { package = "ironfish_zkp", git = "https://github.com/iron-fish/ironfish.git", branch = "staging" }
 blst = "=0.3.10"
 blstrs = { version = "0.6.0", features = ["portable"] }
 bellperson = { git = "https://github.com/iron-fish/bellperson.git", branch = "blstrs", features = [
