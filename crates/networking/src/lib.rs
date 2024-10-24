@@ -4,6 +4,7 @@ pub mod rpc_abi;
 pub mod rpc_handler;
 pub mod server_handler;
 pub mod socket_message;
+pub mod stream;
 pub mod web_abi;
 
 use db_handler::{DBTransaction, InnerBlock, Json};

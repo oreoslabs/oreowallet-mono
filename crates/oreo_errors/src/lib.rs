@@ -41,6 +41,8 @@ pub enum OreoError {
     DServerError,
     #[error("Unauthorized")]
     Unauthorized,
+    #[error("RPC stream error")]
+    RpcStreamError(String),
 }
 
 impl IntoResponse for OreoError {
@@ -70,6 +72,7 @@ impl IntoResponse for OreoError {
             OreoError::ParseError(_) => (StatusCode::from_u16(613).unwrap(), self.to_string()),
             OreoError::DServerError => (StatusCode::from_u16(614).unwrap(), self.to_string()),
             OreoError::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
+            OreoError::RpcStreamError(_) => (StatusCode::from_u16(615).unwrap(), self.to_string()),
         };
         Json(json!({"code": status_code.as_u16(), "error": err_msg})).into_response()
     }

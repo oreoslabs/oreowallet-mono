@@ -11,6 +11,11 @@ pub struct RpcResponse<T> {
     pub data: T,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcResponseStream<T> {
+    pub data: T
+}
+
 impl<T: Serialize> IntoResponse for RpcResponse<T> {
     fn into_response(self) -> axum::response::Response {
         Json(json!({"code": 200, "data": self.data})).into_response()
