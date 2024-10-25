@@ -257,7 +257,7 @@ pub struct RpcGetTransactionsRequest {
     pub reverse: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionStatus {
     pub hash: String,
@@ -281,7 +281,7 @@ pub struct RpcGetAccountTransactionRequest {
     pub notes: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetBalanceDelta {
     pub asset_id: String,

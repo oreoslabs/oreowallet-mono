@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use oreo_errors::OreoError;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use ureq::Response;
 
 use crate::rpc_abi::RpcResponseStream;
@@ -13,7 +13,7 @@ pub struct StreamReader<T, R> {
     _marker: PhantomData<T>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(untagged)]
 enum ResponseItem<T> {
     Data(RpcResponseStream<T>),
@@ -92,3 +92,71 @@ impl ResponseExt for Response {
         StreamReader::new(Box::new(reader))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::rpc_abi::TransactionStatus;
+
+    use super::*;
+
+    #[test]
+    fn test_stream_reader_with_status() {
+        // Prepare some test data.
+        let transaction_status = TransactionStatus {
+          hash: "cde4c2a5bc7cb6cbad93a414ff76176e07412fbd48f2f3d1ee8f7fc1238626a5".to_string(),
+          fee: "1".to_string(),
+          r#type: "type".to_string(),
+          status: "status".to_string(),
+          block_sequence: Some(1),
+          timestamp: 1,
+          asset_balance_deltas: Vec::new(),
+        };
+        let item1: RpcResponseStream<TransactionStatus> = RpcResponseStream { data: transaction_status.clone() };
+        let response1 = ResponseItem::Data(item1);
+
+        let status = ResponseItem::<TransactionStatus>::Status { status: 200 };
+
+        let json1 = serde_json::to_string(&response1).unwrap();
+        let json_status = serde_json::to_string(&status).unwrap();
+
+        // Add \x0c separators
+        let data = format!("{}\x0c{}\x0c", json1, json_status);
+
+        let reader = StreamReader::<TransactionStatus, _>::new(data.as_bytes());
+        let items: Vec<_> = reader.collect();
+        let returned_status = items[0].as_ref().unwrap();
+        assert_eq!(returned_status.hash, transaction_status.hash);
+        assert_eq!(returned_status.fee, transaction_status.fee);
+        assert_eq!(returned_status.r#type, transaction_status.r#type);
+        assert_eq!(returned_status.status, transaction_status.status);
+        assert_eq!(returned_status.block_sequence, transaction_status.block_sequence);
+        assert_eq!(returned_status.timestamp, transaction_status.timestamp);
+        assert_eq!(returned_status.asset_balance_deltas.len(), transaction_status.asset_balance_deltas.len());
+    }
+
+    #[test]
+    fn test_stream_reader_with_error_status() {
+        // Prepare some test data.
+        let item1 = RpcResponseStream { data: 42u32 };
+        let response1 = ResponseItem::Data(item1);
+
+        let status = ResponseItem::<u32>::Status { status: 500 };
+
+        let json1 = serde_json::to_string(&response1).unwrap();
+        let json_status = serde_json::to_string(&status).unwrap();
+
+        // Add \x0c separators
+        let data = format!("{}\x0c{}\x0c", json1, json_status);
+
+        let reader = StreamReader::<u32, _>::new(data.as_bytes());
+        let items: Vec<_> = reader.collect();
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0], Ok(42u32));
+
+        match &items[1] {
+            Err(OreoError::RpcStreamError(msg)) => assert!(msg.contains("Received error status: 500")),
+            _ => panic!("Expected error with status code 500"),
+        }
+    }
+  }
