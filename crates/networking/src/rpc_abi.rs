@@ -102,6 +102,7 @@ pub struct RpcSetAccountHeadRequest {
     pub start: String,
     pub end: String,
     pub blocks: Vec<BlockWithHash>,
+    pub scan_complete: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
