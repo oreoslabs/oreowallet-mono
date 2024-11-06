@@ -11,6 +11,11 @@ pub struct RpcResponse<T> {
     pub data: T,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RpcResponseStream<T> {
+    pub data: T
+}
+
 impl<T: Serialize> IntoResponse for RpcResponse<T> {
     fn into_response(self) -> axum::response::Response {
         Json(json!({"code": 200, "data": self.data})).into_response()
@@ -253,7 +258,7 @@ pub struct RpcGetTransactionsRequest {
     pub reverse: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TransactionStatus {
     pub hash: String,
@@ -277,7 +282,7 @@ pub struct RpcGetAccountTransactionRequest {
     pub notes: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AssetBalanceDelta {
     pub asset_id: String,
