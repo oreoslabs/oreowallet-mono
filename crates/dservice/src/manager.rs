@@ -284,6 +284,7 @@ impl Manager {
                 .get(&address)
                 .unwrap()
                 .clone();
+            let scan_complete = account_info.remaining_task == 0;
             let set_account_head_request = RpcSetAccountHeadRequest {
                 account: address.clone(),
                 start: account_info.start_block.hash.to_string(),
@@ -309,7 +310,7 @@ impl Manager {
             };
             match self.shared.server_handler.submit_scan_response(request) {
                 Ok(msg) => {
-                    if msg.success && account_info.end_block.hash == latest_scanned_block.hash {
+                    if msg.success && scan_complete {
                         let _ = self.account_mappling.write().await.remove(&address);
                     }
                 }

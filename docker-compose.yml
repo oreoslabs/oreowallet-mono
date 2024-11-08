@@ -157,6 +157,7 @@ services:
     depends_on:
       - migration
       - chainloader
+      - dservice
     networks:
       - oreowallet_network
     ulimits:

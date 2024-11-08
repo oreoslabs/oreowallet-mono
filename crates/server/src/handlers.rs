@@ -17,7 +17,7 @@ use networking::{
 };
 use oreo_errors::OreoError;
 use serde_json::json;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;
@@ -40,7 +40,8 @@ pub async fn import_account_handler<T: DBHandler>(
         outgoing_view_key,
         public_address,
         created_at,
-    } = import;
+    } = import.clone();
+    info!("Import account request: {:?}", import);
     let rpc_data = RpcImportAccountRequest {
         view_key,
         incoming_view_key: incoming_view_key.clone(),
@@ -86,6 +87,7 @@ pub async fn import_account_handler<T: DBHandler>(
                             out_vk: outgoing_view_key.clone(),
                             head: Some(head),
                         };
+                        info!("Scan request fooooo: {:?}", scan_request);
                         let msg = bincode::serialize(&scan_request).unwrap();
                         let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
                             .unwrap()
@@ -196,34 +198,35 @@ pub async fn rescan_account_handler<T: DBHandler>(
         error!("Failed to update scan status: {:?}", err);
         return err.into_response();
     }
-    if let Ok(status) = shared
-        .rpc_handler
-        .get_account_status(RpcGetAccountStatusRequest {
-            account: account.name.clone(),
-        })
-    {
-        let head = status.data.account.head.unwrap_or(BlockInfo {
+    let head;
+    if account.create_hash.is_none() || account.create_head.is_none() {
+        head = BlockInfo {
             hash: shared.genesis_hash.clone(),
             sequence: MAINNET_GENESIS_SEQUENCE as u64,
-        });
-        let scan_request = ScanRequest {
-            address: account.address.clone(),
-            in_vk: account.in_vk.clone(),
-            out_vk: account.out_vk.clone(),
-            head: Some(head),
         };
-        let msg = bincode::serialize(&scan_request).unwrap();
-        let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
-            .unwrap()
-            .to_string();
-        let scan_request = shared.scan_handler.submit_scan_request(DecryptionMessage {
-            message: scan_request,
-            signature,
-        });
-        if let Err(err) = scan_request {
-            error!("Failed to submit scan request: {:?}", err);
-            return err.into_response();
-        }
+    } else {
+        head = BlockInfo {
+            hash: account.create_hash.unwrap(),
+            sequence: account.create_head.unwrap() as u64,
+        };
+    }
+    let scan_request = ScanRequest {
+        address: account.address.clone(),
+        in_vk: account.in_vk.clone(),
+        out_vk: account.out_vk.clone(),
+        head: Some(head),
+    };
+    let msg = bincode::serialize(&scan_request).unwrap();
+    let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
+        .unwrap()
+        .to_string();
+    let scan_request = shared.scan_handler.submit_scan_request(DecryptionMessage {
+        message: scan_request,
+        signature,
+    });
+    if let Err(err) = scan_request {
+        error!("Failed to submit scan request: {:?}", err);
+        return err.into_response();
     }
     RpcResponse {
         status: 200,
@@ -255,15 +258,22 @@ pub async fn update_scan_status_handler<T: DBHandler>(
                 return e.into_response();
             }
             let account = db_account.unwrap();
+            let reset_created_at = account.create_head.is_none() || account.create_head.unwrap() == 1;
+            let reset = shared.rpc_handler.reset_account(RpcResetAccountRequest {
+                account: account.name.clone(),
+                reset_scanning_enabled: Some(false),
+                reset_created_at: Some(reset_created_at),
+            });
+            if let Err(e) = reset {
+                return e.into_response();
+            }
             message.account = account.name.clone();
-            let scan_complete = message.scan_complete.clone();
-            info!("set account message: {:?}", message.clone());
-            let resp = shared.rpc_handler.set_account_head(message);
+            let resp = shared.rpc_handler.set_account_head(message.clone());
 
             if resp.is_err() {
-                info!("Failed to update account head: {:?}", resp.unwrap_err());
+                error!("Failed to update account head: {:?}", resp.unwrap_err());
             }
-            if scan_complete {
+            if message.scan_complete {
                 let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                     account: account.name.clone(),
                     enabled: true,
