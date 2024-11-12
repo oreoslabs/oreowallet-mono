@@ -48,3 +48,17 @@ PUBLIC_KEY=03221b2a0ebd9d6798aadee2861a5307ced1a33d143f34c571a98ab4fa534b7d3e \
 SERVER_PORT=8080 \
 docker-compose up
 ```
+
+Or you can use up with local .env file by copying .env.local to .env:
+
+```bash
+cp .env.local .env
+docker compose up --build
+```
+
+Tips
+
+This came in handy for me because I had a different version of postgres running. To remove all previous data: 
+```bash
+docker compose down -v
+```

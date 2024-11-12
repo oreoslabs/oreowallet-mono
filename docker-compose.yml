@@ -1,6 +1,7 @@
 version: '2.4'
 services:
   dbconfig:
+    env_file: .env
     image: alpine:latest
     volumes:
       - conf:/app/conf  # Mount the config directory on the host to the container
@@ -14,7 +15,8 @@ services:
       protocol: \"postgres\"' > /app/conf/dbconfig"
 
   postgres:
-    image: postgres:latest
+    env_file: .env
+    image: postgres:16
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -27,11 +29,13 @@ services:
       - oreowallet_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   migration:
+    env_file: .env
     build: .
     image: "oreowallet"
     command: /bin/sh -c "./sqlx database create && ./sqlx migrate run"
@@ -40,8 +44,10 @@ services:
     networks:
       - oreowallet_network
     depends_on:
-      - postgres
-      - dbconfig
+      postgres:
+        condition: service_healthy
+      dbconfig:
+        condition: service_completed_successfully
     logging:
         driver: "json-file"
         options:
@@ -49,6 +55,7 @@ services:
             max-size: "25m"
 
   chainloader:
+    env_file: .env
     build: .
     restart: always
     image: "oreowallet"
@@ -56,7 +63,8 @@ services:
     volumes:
        - conf:/app/conf
     depends_on:
-      - migration
+      migration:
+        condition: service_completed_successfully
     networks:
       - oreowallet_network
     ulimits:
@@ -70,6 +78,7 @@ services:
             max-size: "25m"
 
   prover:
+    env_file: .env
     build: .
     restart: always
     image: "oreowallet"
@@ -77,8 +86,10 @@ services:
     ports:
       - "10002:10002"
     depends_on:
-      - migration
-      - chainloader
+      migration:
+        condition: service_completed_successfully
+      chainloader:
+        condition: service_completed_successfully
     networks:
       - oreowallet_network
     ulimits:
@@ -92,6 +103,7 @@ services:
             max-size: "25m"
 
   server:
+    env_file: .env
     build: .
     restart: always
     image: "oreowallet"
@@ -121,6 +133,7 @@ services:
             max-size: "25m"
 
   dservice:
+    env_file: .env
     build: .
     restart: always
     image: "oreowallet"
@@ -134,8 +147,10 @@ services:
     volumes:
       - conf:/app/conf
     depends_on:
-      - migration
-      - chainloader
+      migration:
+        condition: service_completed_successfully
+      chainloader:
+        condition: service_completed_successfully
     networks:
       oreowallet_network:
         ipv4_address: 172.19.0.10
@@ -150,14 +165,18 @@ services:
             max-size: "25m"
 
   dworker:
+    env_file: .env
     build: .
     restart: always
     image: "oreowallet"
     command: ./dworker --address 172.19.0.10:10001 --verbosity ${VERBOSITY:-0}
     depends_on:
-      - migration
-      - chainloader
-      - dservice
+      migration:
+        condition: service_completed_successfully
+      chainloader:
+        condition: service_completed_successfully
+      dservice:
+        condition: service_completed_successfully
     networks:
       - oreowallet_network
     ulimits:
