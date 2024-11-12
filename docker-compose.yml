@@ -29,10 +29,9 @@ services:
       - oreowallet_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
 
   migration:
     env_file: .env
@@ -44,10 +43,8 @@ services:
     networks:
       - oreowallet_network
     depends_on:
-      postgres:
-        condition: service_healthy
-      dbconfig:
-        condition: service_completed_successfully
+      - postgres
+      - dbconfig
     logging:
         driver: "json-file"
         options:
@@ -63,8 +60,7 @@ services:
     volumes:
        - conf:/app/conf
     depends_on:
-      migration:
-        condition: service_completed_successfully
+      - migration
     networks:
       - oreowallet_network
     ulimits:
@@ -86,10 +82,8 @@ services:
     ports:
       - "10002:10002"
     depends_on:
-      migration:
-        condition: service_completed_successfully
-      chainloader:
-        condition: service_completed_successfully
+      - migration
+      - chainloader
     networks:
       - oreowallet_network
     ulimits:
@@ -147,10 +141,8 @@ services:
     volumes:
       - conf:/app/conf
     depends_on:
-      migration:
-        condition: service_completed_successfully
-      chainloader:
-        condition: service_completed_successfully
+      - migration
+      - chainloader
     networks:
       oreowallet_network:
         ipv4_address: 172.19.0.10
@@ -171,12 +163,9 @@ services:
     image: "oreowallet"
     command: ./dworker --address 172.19.0.10:10001 --verbosity ${VERBOSITY:-0}
     depends_on:
-      migration:
-        condition: service_completed_successfully
-      chainloader:
-        condition: service_completed_successfully
-      dservice:
-        condition: service_completed_successfully
+      - migration
+      - chainloader
+      - dservice
     networks:
       - oreowallet_network
     ulimits:
