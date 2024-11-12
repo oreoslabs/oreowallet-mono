@@ -17,7 +17,7 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::{FramedRead, FramedWrite};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
 
 pub async fn decrypt(worker_pool: Arc<ThreadPool>, request: DRequest) -> DResponse {
     let DRequest {
@@ -91,7 +91,7 @@ pub async fn handle_connection(
     stream: TcpStream,
     worker_name: String,
 ) -> anyhow::Result<()> {
-    info!("connected to scheduler");
+    debug!("connected to scheduler");
     let (r, w) = split(stream);
     let mut socket_w_handler = FramedWrite::new(w, DMessageCodec::default());
     let mut socket_r_handler = FramedRead::new(r, DMessageCodec::default());
@@ -133,7 +133,7 @@ pub async fn handle_connection(
         while let Some(Ok(message)) = socket_r_handler.next().await {
             match message {
                 DMessage::DRequest(request) => {
-                    info!("new task from scheduler: {}", request.id.clone());
+                    debug!("new task from scheduler: {}", request.id.clone());
                     let response = decrypt(worker_pool.clone(), request).await;
                     if let Err(e) = task_tx.send(DMessage::DResponse(response)).await {
                         error!("failed to send response to write channel, {}", e);

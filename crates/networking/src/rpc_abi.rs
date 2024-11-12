@@ -47,6 +47,7 @@ pub struct RpcImportAccountRequest {
     pub outgoing_view_key: String,
     pub public_address: String,
     pub created_at: Option<BlockInfo>,
+    pub spending_key: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -365,6 +366,7 @@ pub struct RpcGetBlockResponse {
 pub struct RpcGetBlocksRequest {
     pub start: u64,
     pub end: u64,
+    pub serialized: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 mod handler;
 
 pub use handler::*;
+use tracing::error;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RpcError {
@@ -22,7 +23,10 @@ impl TryFrom<RpcError> for OreoError {
                 // Should never happen
                 return Ok(OreoError::Duplicate("0x00".to_string()));
             }
-            _ => Ok(OreoError::InternalRpcError),
+            _ => {
+                error!("Rpc error: {:?}", value);
+                return Ok(OreoError::InternalRpcError(value.message));
+            }
         }
     }
 }

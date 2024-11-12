@@ -219,7 +219,7 @@ impl Manager {
                                             false => {
                                                 let worker = ServerWorker::new(tx.clone());
                                                 worker_name = register.name;
-                                                info!("new worker: {}", worker_name.clone());
+                                                debug!("new worker: {}", worker_name.clone());
                                                 let _ = worker_server.workers.write().await.insert(worker_name.clone(), worker);
                                                 let data = worker_server.task_queue.write().await.pop();
                                                 match data {

@@ -20,7 +20,7 @@ pub enum OreoError {
     #[error("Internal db error")]
     DBError,
     #[error("Internal Ironfish rpc error")]
-    InternalRpcError,
+    InternalRpcError(String),
     #[error("The `{0}` spend circuit can not generate proof")]
     GenerateSpendProofFailed(u32),
     #[error("The `{0}` output circuit can not generate proof")]
@@ -53,7 +53,7 @@ impl IntoResponse for OreoError {
             OreoError::NoImported(_) => (StatusCode::from_u16(602).unwrap(), self.to_string()),
             OreoError::Scanning(_) => (StatusCode::from_u16(603).unwrap(), self.to_string()),
             OreoError::Syncing => (StatusCode::from_u16(604).unwrap(), self.to_string()),
-            OreoError::InternalRpcError => (StatusCode::from_u16(605).unwrap(), self.to_string()),
+            OreoError::InternalRpcError(_) => (StatusCode::from_u16(605).unwrap(), self.to_string()),
             OreoError::GenerateSpendProofFailed(_) => {
                 (StatusCode::from_u16(606).unwrap(), self.to_string())
             }
