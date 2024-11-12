@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{extract, response::IntoResponse, Json};
-use bellperson::groth16;
+use ironfish_bellperson::groth16;
 use ironfish_rust::sapling_bls12::SAPLING;
 use ironfish_zkp::proofs::{MintAsset, Output, Spend};
 use networking::web_abi::{GenerateProofRequest, GenerateProofResponse};
