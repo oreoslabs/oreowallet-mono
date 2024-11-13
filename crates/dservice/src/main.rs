@@ -51,15 +51,6 @@ async fn main() -> Result<()> {
     handle_signals().await?;
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
-    run_dserver(
-        dlisten,
-        restful,
-        node,
-        db_handler,
-        server,
-        sk_u8,
-        pk_u8,
-    )
-    .await?;
+    run_dserver(dlisten, restful, node, db_handler, server, sk_u8, pk_u8).await?;
     Ok(())
 }
