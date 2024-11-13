@@ -81,7 +81,7 @@ impl RpcHandler {
         request: RpcGetAccountStatusRequest,
     ) -> Result<RpcResponse<RpcGetAccountStatusResponse>, OreoError> {
         let path = format!("http://{}/wallet/getAccountStatus", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
 
@@ -90,7 +90,7 @@ impl RpcHandler {
         request: RpcSetScanningRequest,
     ) -> Result<RpcResponse<Option<()>>, OreoError> {
         let path = format!("http://{}/wallet/setScanning", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
 
@@ -99,7 +99,7 @@ impl RpcHandler {
         request: RpcSetAccountHeadRequest,
     ) -> Result<RpcResponse<Option<()>>, OreoError> {
         let path = format!("http://{}/wallet/setAccountHead", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
 
@@ -108,7 +108,7 @@ impl RpcHandler {
         request: RpcResetAccountRequest,
     ) -> Result<RpcResponse<Option<()>>, OreoError> {
         let path = format!("http://{}/wallet/resetAccount", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
 
@@ -117,7 +117,7 @@ impl RpcHandler {
         request: RpcGetBalancesRequest,
     ) -> Result<RpcResponse<RpcGetBalancesResponse>, OreoError> {
         let path = format!("http://{}/wallet/getBalances", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
 
@@ -126,7 +126,7 @@ impl RpcHandler {
         request: RpcGetAccountTransactionRequest,
     ) -> Result<RpcResponse<RpcGetAccountTransactionResponse>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransaction", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
     
@@ -135,7 +135,7 @@ impl RpcHandler {
         request: RpcGetTransactionsRequest,
     ) -> Result<RpcResponse<RpcGetTransactionsResponse>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
     
         match resp {
             Ok(response) => {
@@ -159,7 +159,7 @@ impl RpcHandler {
         request: RpcCreateTxRequest,
     ) -> Result<RpcResponse<RpcCreateTxResponse>, OreoError> {
         let path = format!("http://{}/wallet/createTransaction", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
 
@@ -168,7 +168,7 @@ impl RpcHandler {
         request: RpcBroadcastTxRequest,
     ) -> Result<RpcResponse<RpcBroadcastTxResponse>, OreoError> {
         let path = format!("http://{}/chain/broadcastTransaction", self.endpoint);
-        let resp = self.agent.clone().post(&path).send_json(&request);
+        let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
 

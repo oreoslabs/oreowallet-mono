@@ -44,7 +44,7 @@ where
 {
     pub fn new(db_handler: T, endpoint: &str, scan: &str, secp: SecpKey, genesis_hash: String) -> Self {
         Self {
-            db_handler: db_handler,
+            db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
             scan_handler: ServerHandler::new(scan.into()),
             secp,
@@ -70,11 +70,11 @@ pub async fn auth<T: DBHandler>(
             if token_hex != basic.password() {
                 return Err((StatusCode::UNAUTHORIZED, "Invalid token"));
             }
-            return Ok(next.run(req).await);
+            Ok(next.run(req).await)
         }
         Err(_) => {
             // Token is invalid
-            return Err((StatusCode::UNAUTHORIZED, "Invalid token"));
+            Err((StatusCode::UNAUTHORIZED, "Invalid token"))
         }
     }
 }
@@ -89,7 +89,7 @@ pub async fn run_server(
 ) -> Result<()> {
     let genesis_hash;
     {
-        let temp_handler: RpcHandler = RpcHandler::new(rpc_server.clone().into());
+        let temp_handler: RpcHandler = RpcHandler::new(rpc_server.clone());
         let latest_block_response = temp_handler.get_latest_block()?.data;
         genesis_hash = latest_block_response.genesis_block_identifier.hash;
     }

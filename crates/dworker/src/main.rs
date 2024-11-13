@@ -31,8 +31,7 @@ async fn main() -> Result<()> {
                 "dworker-{:?}-{}",
                 gethostname::gethostname(),
                 rand::thread_rng().gen::<u8>()
-            )
-            .into(),
+            ),
         );
     }
     info!(
