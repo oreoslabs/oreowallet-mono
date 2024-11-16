@@ -71,20 +71,11 @@ impl TransactionDetail {
             asset_balance_deltas,
             notes,
         } = tx;
-        let mut notes = notes.unwrap();
-        let note = match notes
-            .iter()
-            .filter(|asset| asset.owner != asset.sender)
-            .collect::<Vec<&RpcNote>>()
-            .len()
-        {
-            0 => notes.pop(),
-            _ => notes
-                .into_iter()
-                .filter(|asset| asset.owner != asset.sender)
-                .collect::<Vec<RpcNote>>()
-                .pop(),
-        };
+        let notes = notes.unwrap();
+        let note = notes.iter()
+            .find(|asset| asset.owner != asset.sender)
+            .or_else(|| notes.iter().find(|note| !note.memo.is_empty()))
+            .or_else(|| notes.first());
         match note {
             Some(RpcNote {
                 value,
