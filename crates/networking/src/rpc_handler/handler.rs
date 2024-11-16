@@ -193,7 +193,7 @@ impl RpcHandler {
             .agent
             .clone()
             .post(&path)
-            .send_json(RpcGetBlocksRequest { start, end });
+            .send_json(RpcGetBlocksRequest { start, end, serialized: true });
         handle_response(resp)
     }
 

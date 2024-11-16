@@ -95,7 +95,7 @@ impl TransactionDetail {
                 memo: Some(memo.into()),
                 value: value.into(),
             }),
-            None => Err(OreoError::InternalRpcError),
+            None => Err(OreoError::InternalRpcError("No note found".into())),
         }
     }
 }
