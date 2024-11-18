@@ -19,6 +19,7 @@ use networking::{
 };
 use oreo_errors::OreoError;
 use serde_json::json;
+use tracing::error;
 use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;
@@ -242,10 +243,22 @@ pub async fn update_scan_status_handler<T: DBHandler>(
                 return e.into_response();
             }
             let account = db_account.unwrap();
+            let reset_created_at = account.create_head.is_none() || account.create_head.unwrap() == 1;
+            let reset = shared.rpc_handler.reset_account(RpcResetAccountRequest {
+                account: account.name.clone(),
+                reset_scanning_enabled: Some(false),
+                reset_created_at: Some(reset_created_at),
+            });
+            if let Err(e) = reset {
+                return e.into_response();
+            }
             message.account = account.name.clone();
-            let scan_complete = message.scan_complete;
-            let _ = shared.rpc_handler.set_account_head(message);
-            if scan_complete {
+            let resp = shared.rpc_handler.set_account_head(message.clone());
+
+            if resp.is_err() {
+                error!("Failed to update account head: {:?}", resp.unwrap_err());
+            }
+            if message.scan_complete {
                 let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                     account: account.name.clone(),
                     enabled: true,
