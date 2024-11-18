@@ -8,7 +8,7 @@ use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::{
     rpc_abi::{
-        RpcBroadcastTxRequest, RpcBroadcastTxResponse, RpcCreateTxRequest, RpcCreateTxResponse,
+        RpcAddTxRequest, RpcAddTxResponse, RpcCreateTxRequest, RpcCreateTxResponse,
         RpcExportAccountResponse, RpcGetAccountStatusRequest, RpcGetAccountStatusResponse,
         RpcGetAccountTransactionRequest, RpcGetAccountTransactionResponse, RpcGetBalancesRequest,
         RpcGetBalancesResponse, RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest,
@@ -155,11 +155,11 @@ impl RpcHandler {
         handle_response(resp)
     }
 
-    pub fn broadcast_transaction(
+    pub fn add_transaction(
         &self,
-        request: RpcBroadcastTxRequest,
-    ) -> Result<RpcResponse<RpcBroadcastTxResponse>, OreoError> {
-        let path = format!("http://{}/chain/broadcastTransaction", self.endpoint);
+        request: RpcAddTxRequest,
+    ) -> Result<RpcResponse<RpcAddTxResponse>, OreoError> {
+        let path = format!("http://{}/wallet/addTransaction", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
         handle_response(resp)
     }

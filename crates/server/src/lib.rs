@@ -15,7 +15,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 use crate::handlers::{
-    account_status_handler, broadcast_transaction_handler, create_transaction_handler,
+    account_status_handler, add_transaction_handler, create_transaction_handler,
     get_balances_handler, get_ores_handler, get_transaction_handler, get_transactions_handler,
     health_check_handler, import_account_handler, latest_block_handler, remove_account_handler,
     rescan_account_handler, update_scan_status_handler,
@@ -107,7 +107,8 @@ pub async fn run_server(
         .route("/getTransaction", post(get_transaction_handler))
         .route("/getTransactions", post(get_transactions_handler))
         .route("/createTx", post(create_transaction_handler))
-        .route("/broadcastTx", post(broadcast_transaction_handler))
+        .route("/broadcastTx", post(add_transaction_handler)) // TODO: Remove after front end updates to addTx
+        .route("/addTx", post(add_transaction_handler)) 
         .route("/accountStatus", post(account_status_handler))
         .route("/latestBlock", get(latest_block_handler))
         .route("/ores", post(get_ores_handler))

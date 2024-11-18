@@ -241,15 +241,14 @@ pub struct RpcCreateTxResponse {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct RpcBroadcastTxRequest {
+pub struct RpcAddTxRequest {
     pub transaction: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct RpcBroadcastTxResponse {
+pub struct RpcAddTxResponse {
     pub hash: String,
     pub accepted: bool,
-    pub broadcasted: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
