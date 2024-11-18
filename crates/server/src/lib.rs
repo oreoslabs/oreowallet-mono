@@ -35,18 +35,20 @@ pub struct SharedState<T: DBHandler> {
     pub rpc_handler: RpcHandler,
     pub scan_handler: ServerHandler,
     pub secp: SecpKey,
+    pub genesis_hash: String,
 }
 
 impl<T> SharedState<T>
 where
     T: DBHandler,
 {
-    pub fn new(db_handler: T, endpoint: &str, scan: &str, secp: SecpKey) -> Self {
+    pub fn new(db_handler: T, endpoint: &str, scan: &str, secp: SecpKey, genesis_hash: String) -> Self {
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
             scan_handler: ServerHandler::new(scan.into()),
             secp,
+            genesis_hash,
         }
     }
 }
@@ -86,6 +88,13 @@ pub async fn run_server(
     sk_u8: [u8; 32],
     pk_u8: [u8; 33],
 ) -> Result<()> {
+    let genesis_hash;
+    {
+        let temp_handler: RpcHandler = RpcHandler::new(rpc_server.clone().into());
+        let latest_block_response = temp_handler.get_latest_block()?.data;
+        genesis_hash = latest_block_response.genesis_block_identifier.hash;
+    }
+    info!("Genesis hash: {}", genesis_hash);
     let shared_resource = Arc::new(SharedState::new(
         db_handler,
         &rpc_server,
@@ -94,6 +103,7 @@ pub async fn run_server(
             sk: sk_u8,
             pk: pk_u8,
         },
+        genesis_hash,
     ));
     let auth_middleware = from_fn_with_state(shared_resource.clone(), auth);
 

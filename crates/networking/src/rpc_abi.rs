@@ -1,5 +1,5 @@
 use axum::{response::IntoResponse, Json};
-use constants::{IRON_NATIVE_ASSET, MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
+use constants::IRON_NATIVE_ASSET;
 use serde::{Deserialize, Serialize};
 use ureq::json;
 
@@ -26,15 +26,6 @@ impl<T: Serialize> IntoResponse for RpcResponse<T> {
 pub struct BlockInfo {
     pub hash: String,
     pub sequence: u64,
-}
-
-impl Default for BlockInfo {
-    fn default() -> Self {
-        Self {
-            hash: MAINNET_GENESIS_HASH.to_string(),
-            sequence: MAINNET_GENESIS_SEQUENCE as u64,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -333,6 +324,7 @@ pub struct BlockIdentifier {
 #[serde(rename_all = "camelCase")]
 pub struct RpcGetLatestBlockResponse {
     pub current_block_identifier: BlockIdentifier,
+    pub genesis_block_identifier: BlockIdentifier,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
