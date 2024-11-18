@@ -10,7 +10,7 @@ use db_handler::DBHandler;
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest, ScanResponse, SuccessResponse},
     rpc_abi::{
-        BlockInfo, OutPut, RpcBroadcastTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
+        BlockInfo, OutPut, RpcAddTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
         RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
         RpcGetTransactionsRequest, RpcImportAccountRequest, RpcImportAccountResponse,
         RpcRemoveAccountRequest, RpcResetAccountRequest, RpcResponse, RpcSetScanningRequest,
@@ -420,13 +420,13 @@ pub async fn create_transaction_handler<T: DBHandler>(
         .into_response()
 }
 
-pub async fn broadcast_transaction_handler<T: DBHandler>(
+pub async fn add_transaction_handler<T: DBHandler>(
     State(shared): State<Arc<SharedState<T>>>,
-    extract::Json(broadcast_transaction): extract::Json<RpcBroadcastTxRequest>,
+    extract::Json(broadcast_transaction): extract::Json<RpcAddTxRequest>,
 ) -> impl IntoResponse {
     shared
         .rpc_handler
-        .broadcast_transaction(broadcast_transaction)
+        .add_transaction(broadcast_transaction)
         .into_response()
 }
 
