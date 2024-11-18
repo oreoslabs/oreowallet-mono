@@ -50,9 +50,9 @@ services:
 
   chainloader:
     build: .
-    restart: always
+    restart: on-failure
     image: "oreowallet"
-    command: ./chain_loader --dbconfig /app/conf/dbconfig --node ${NODE_HOST}:${NODE_PORT} --verbosity ${VERBOSITY:-0}
+    command: sh -c 'if [ "$CHAINLOAD" = "true" ]; then ./chain_loader --dbconfig /app/conf/dbconfig --node ${NODE_HOST}:${NODE_PORT} --verbosity ${VERBOSITY:-0}; else echo "SKIPPING CHAIN LOADER"; fi'
     volumes:
        - conf:/app/conf
     depends_on:

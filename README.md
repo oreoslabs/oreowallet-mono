@@ -35,9 +35,10 @@ Run node:
 ironfish start -d ~/.ironfish-testnet --rpc.http --rpc.http.port 9092 --rpc.http.host 0.0.0.0
 ```
 
-Run
+Run (run with CHAINLOAD=true ONLY for first run)
 
 ```bash
+CHAINLOAD=true \
 DB_USER=postgres \
 DB_PASSWORD=postgres \
 DB_PORT=5444 \
