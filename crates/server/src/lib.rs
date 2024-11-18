@@ -148,7 +148,12 @@ pub async fn run_server(
         );
 
     let listener = TcpListener::bind(&listen).await?;
+    let app = router.fallback(handler_404);
     info!("Server listening on {}", listen);
-    axum::serve(listener, router).await?;
+    axum::serve(listener, app).await?;
     Ok(())
+}
+
+async fn handler_404() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "Not Found")
 }
