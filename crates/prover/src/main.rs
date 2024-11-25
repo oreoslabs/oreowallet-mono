@@ -3,10 +3,10 @@ use std::net::SocketAddr;
 use anyhow::Result;
 use clap::Parser;
 use prover::run_prover;
-use utils::{handle_signals, initialize_logger};
+use utils::initialize_logger;
 
 #[derive(Parser, Debug, Clone)]
-pub struct Command {
+pub struct Prover {
     /// The ip:port server will listen on
     #[clap(short, long, default_value = "0.0.0.0:10002")]
     pub listen: SocketAddr,
@@ -17,10 +17,8 @@ pub struct Command {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Command::parse();
-    let Command { listen, verbosity } = args;
-    initialize_logger(verbosity);
-    handle_signals().await?;
-    run_prover(listen.into()).await?;
+    let prover = Prover::parse();
+    initialize_logger(prover.verbosity);
+    run_prover(prover.listen.into()).await?;
     Ok(())
 }
