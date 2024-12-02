@@ -7,7 +7,7 @@ use axum::{
     routing::{get, post},
     BoxError, Router,
 };
-use tokio::{net::TcpListener, signal};
+use tokio::{net::TcpListener, signal, time::sleep};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
@@ -65,7 +65,13 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        _ = ctrl_c => {
+            info!("Ctrl+C received, exit");
+            sleep(Duration::from_secs(3)).await;
+        },
+        _ = terminate => {
+            info!("terminate signal received, exit");
+            sleep(Duration::from_secs(3)).await;
+        },
     }
 }
