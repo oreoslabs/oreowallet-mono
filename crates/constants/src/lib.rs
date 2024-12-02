@@ -13,3 +13,4 @@ pub const SECONDARY_BATCH: i64 = 10000;
 pub const RESCHEDULING_DURATION: Duration = Duration::from_secs(30);
 pub const PRIMARY_BATCH: u64 = 100;
 pub const LOCAL_BLOCKS_CHECKPOINT: u64 = 797_000;
+pub const MAX_SPEND_PROOFS: usize = 15;
