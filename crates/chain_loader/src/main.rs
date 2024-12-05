@@ -2,7 +2,8 @@ use anyhow::Result;
 use chain_loader::load_checkpoint;
 use clap::Parser;
 use db_handler::{DBHandler, DbConfig, PgHandler};
-use utils::{handle_signals, initialize_logger};
+use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
+use utils::initialize_logger;
 
 #[derive(Parser, Debug, Clone)]
 struct Command {
@@ -15,6 +16,9 @@ struct Command {
     /// The Ironfish rpc node to connect to
     #[clap(short, long, default_value = "127.0.0.1:9092")]
     pub node: String,
+    /// The network id, 0 for mainnet, 1 for testnet.
+    #[clap(long)]
+    pub network: u8,
 }
 
 #[tokio::main]
@@ -24,11 +28,19 @@ async fn main() -> Result<()> {
         dbconfig,
         verbosity,
         node,
+        network,
     } = args;
     initialize_logger(verbosity);
-    handle_signals().await?;
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
-    load_checkpoint(node, db_handler).await?;
+    match network {
+        Mainnet::ID => {
+            load_checkpoint::<Mainnet>(node, db_handler).await?;
+        }
+        Testnet::ID => {
+            load_checkpoint::<Testnet>(node, db_handler).await?;
+        }
+        _ => panic!("Invalid network used"),
+    }
     Ok(())
 }

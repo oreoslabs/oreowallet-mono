@@ -614,10 +614,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "constants",
  "db_handler",
  "networking",
  "oreo_errors",
+ "params",
  "serde_json",
  "tokio",
  "tracing",
@@ -930,9 +930,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "constants",
  "futures",
  "oreo_errors",
+ "params",
  "redis",
  "serde",
  "serde_json",
@@ -2524,6 +2524,10 @@ checksum = "135590d8bdba2b31346f9cd1fb2a912329f5135e832a4f422942eb6ead8b6b3b"
 dependencies = [
  "group 0.12.1",
 ]
+
+[[package]]
+name = "params"
+version = "0.1.0"
 
 [[package]]
 name = "parking_lot"
