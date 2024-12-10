@@ -7,7 +7,6 @@ use std::{
 };
 
 use anyhow::Result;
-use constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
 use db_handler::{DBHandler, PgHandler};
 use futures::{SinkExt, StreamExt};
 use networking::{
@@ -17,6 +16,7 @@ use networking::{
     server_handler::ServerHandler,
     socket_message::codec::{DMessage, DMessageCodec, DRequest, DResponse},
 };
+use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use priority_queue::PriorityQueue;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -127,10 +127,11 @@ pub struct Manager {
     pub account_mappling: Arc<RwLock<HashMap<String, AccountInfo>>>,
     pub shared: Arc<SharedState<PgHandler>>,
     pub accounts_to_scan: Arc<RwLock<Vec<ScanRequest>>>,
+    pub network: u8,
 }
 
 impl Manager {
-    pub fn new(shared: Arc<SharedState<PgHandler>>) -> Arc<Self> {
+    pub fn new(shared: Arc<SharedState<PgHandler>>, network: u8) -> Arc<Self> {
         Arc::new(Self {
             workers: Arc::new(RwLock::new(HashMap::new())),
             task_queue: Arc::new(RwLock::new(PriorityQueue::new())),
@@ -138,7 +139,25 @@ impl Manager {
             account_mappling: Arc::new(RwLock::new(HashMap::new())),
             shared,
             accounts_to_scan: Arc::new(RwLock::new(vec![])),
+            network: network,
         })
+    }
+
+    pub fn genesis_block(&self) -> BlockInfo {
+        match self.network {
+            Mainnet::ID => BlockInfo {
+                hash: Mainnet::GENESIS_BLOCK_HASH.to_string(),
+                sequence: Mainnet::GENESIS_BLOCK_HEIGHT,
+            },
+            Testnet::ID => BlockInfo {
+                hash: Testnet::GENESIS_BLOCK_HASH.to_string(),
+                sequence: Testnet::GENESIS_BLOCK_HEIGHT,
+            },
+            _ => BlockInfo {
+                hash: Mainnet::GENESIS_BLOCK_HASH.to_string(),
+                sequence: Mainnet::GENESIS_BLOCK_HEIGHT,
+            },
+        }
     }
 
     pub async fn initialize_networking(server: Arc<Self>, addr: SocketAddr) -> Result<()> {
@@ -268,10 +287,7 @@ impl Manager {
         let address = response.address.clone();
         let task_id = response.id.clone();
         let mut update_account = false;
-        let mut latest_scanned_block = BlockInfo {
-            hash: MAINNET_GENESIS_HASH.to_string(),
-            sequence: MAINNET_GENESIS_SEQUENCE as u64,
-        };
+        let mut latest_scanned_block = self.genesis_block();
         match self.account_mappling.write().await.get_mut(&address) {
             Some(account) => {
                 if let Some(task_info) = self.task_mapping.read().await.get(&task_id) {

@@ -1,5 +1,4 @@
 use axum::{extract, response::IntoResponse, Json};
-use constants::MAX_SPEND_PROOFS;
 use ironfish_bellperson::groth16;
 use ironfish_rust::sapling_bls12::SAPLING;
 use ironfish_zkp::proofs::{MintAsset, Output, Spend};
@@ -9,6 +8,8 @@ use rand::thread_rng;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde_json::json;
 use tracing::debug;
+
+use crate::MAX_SPEND_PROOFS;
 
 pub async fn generate_proof_handler(
     extract::Json(request): extract::Json<GenerateProofRequest>,

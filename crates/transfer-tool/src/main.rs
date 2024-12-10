@@ -1,11 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
-use constants::IRON_NATIVE_ASSET;
 use db_handler::{DBHandler, DbConfig, PgHandler};
 use networking::{
     rpc_abi::{OutPut, SendTransactionRequest},
     rpc_handler::RpcHandler,
 };
+use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use tracing::info;
 use utils::{handle_signals, initialize_logger};
 #[derive(Parser, Debug, Clone)]
@@ -25,6 +25,9 @@ pub struct Command {
     /// The bonus amount
     #[clap(long)]
     pub bonus: String,
+    /// The network id, 0 for mainnet, 1 for testnet.
+    #[clap(long)]
+    pub network: u8,
 }
 
 #[tokio::main]
@@ -36,12 +39,17 @@ async fn main() -> Result<()> {
         node,
         account,
         bonus,
+        network,
     } = cli;
     initialize_logger(verbosity);
     handle_signals().await?;
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
     let rpc_handler = RpcHandler::new(node);
+    let asset_id = match network {
+        Testnet::ID => Testnet::NATIVE_ASSET_ID.to_string(),
+        _ => Mainnet::NATIVE_ASSET_ID.to_string(),
+    };
     match db_handler.get_unpaid_addresses().await {
         Ok(accounts) => {
             info!("bonus accounts: {:?}", accounts);
@@ -55,7 +63,7 @@ async fn main() -> Result<()> {
                     amount: bonus.clone(),
                     memo: Some("OreoWallet-Bonus".to_string()),
                     memo_hex: Some("".into()),
-                    asset_id: Some(IRON_NATIVE_ASSET.to_string()),
+                    asset_id: Some(asset_id.clone()),
                 });
             }
             if outputs.is_empty() {

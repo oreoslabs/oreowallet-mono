@@ -15,7 +15,6 @@ tokio-util = { version = "0.7.3", features = ["codec"] }
 bytes = "1"
 futures = { version = "0.3.30" }
 tracing = "0.1.40"
-constants = { path = "../constants" }
 oreo_errors = { path = "../oreo_errors" }
 db_handler = { path = "../db_handler" }
 networking = { path = "../networking" }

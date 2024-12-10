@@ -170,8 +170,6 @@ mod tests {
     //   Outgoing View Key  cee4ff41d7d8da5eedc6493134981eaad7b26a8b0291a4eac9ba95090fa47bf7
     //       Address  d63ba13d7c35caf942c64d5139b948b885ec931977a3f248c13e7f3c1bd0aa64
 
-    use constants::MAINNET_GENESIS_HASH;
-    use constants::MAINNET_GENESIS_SEQUENCE;
     use oreo_errors::OreoError;
 
     use super::address_to_name;
@@ -179,6 +177,7 @@ mod tests {
     use crate::config::DbConfig;
     use crate::Account;
     use crate::DBHandler;
+    use params::{mainnet::Mainnet, network::Network};
 
     const VK: &str = "4ae4eb9606ba57b3b17a444100a9ac6453cd67e6fe4c860e63a2e18b1200978ab5ecce68e8639d5016cbe73b0ea9a3c8e906fc881af2e9ccfa7a7b63fb73d555";
     const IN_VK: &str = "4a08bec0ec5a471352f340d737e4b3baec2aec8d0a2e12201d92d8ad71aadd07";
@@ -190,8 +189,8 @@ mod tests {
             name: address_to_name(ADDRESS),
             create_head: None,
             create_hash: None,
-            head: MAINNET_GENESIS_SEQUENCE,
-            hash: MAINNET_GENESIS_HASH.to_string(),
+            head: Mainnet::GENESIS_BLOCK_HEIGHT as i64,
+            hash: Mainnet::GENESIS_BLOCK_HASH.to_string(),
             in_vk: IN_VK.to_string(),
             out_vk: OUT_VK.to_string(),
             vk: VK.to_string(),

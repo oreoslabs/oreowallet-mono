@@ -15,7 +15,6 @@ use axum::{
     routing::post,
     BoxError, Json, Router,
 };
-use constants::{LOCAL_BLOCKS_CHECKPOINT, PRIMARY_BATCH, REORG_DEPTH, RESCHEDULING_DURATION};
 use db_handler::{DBHandler, InnerBlock, PgHandler};
 use manager::{AccountInfo, Manager, SecpKey, ServerMessage, SharedState, TaskInfo};
 use networking::{
@@ -23,6 +22,7 @@ use networking::{
     rpc_abi::BlockInfo,
     socket_message::codec::DRequest,
 };
+use params::network::Network;
 use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
@@ -102,7 +102,7 @@ pub async fn scheduling_tasks(
     Ok(())
 }
 
-pub async fn run_dserver(
+pub async fn run_dserver<N: Network>(
     dlisten: SocketAddr,
     restful: SocketAddr,
     rpc_server: String,
@@ -116,7 +116,7 @@ pub async fn run_dserver(
         pk: pk_u8,
     };
     let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server, &server, secp_key));
-    let manager = Manager::new(shared_resource);
+    let manager = Manager::new(shared_resource, N::ID);
 
     if let Err(e) = Manager::initialize_networking(manager.clone(), dlisten).await {
         error!("init networking server {}", e);
@@ -158,7 +158,7 @@ pub async fn run_dserver(
     tokio::spawn(async move {
         let _ = router.send(());
         loop {
-            sleep(RESCHEDULING_DURATION).await;
+            sleep(N::RESCHEDULING_DURATION).await;
             if !schduler.accounts_to_scan.read().await.is_empty() {
                 if !schduler.account_mappling.read().await.is_empty() {
                     continue;
@@ -175,7 +175,7 @@ pub async fn run_dserver(
                 let scan_end = schduler
                     .shared
                     .rpc_handler
-                    .get_block(latest.index.parse::<i64>().unwrap() - REORG_DEPTH)
+                    .get_block(latest.index.parse::<i64>().unwrap() - N::REORG_DEPTH)
                     .unwrap()
                     .data
                     .block;
@@ -210,9 +210,10 @@ pub async fn run_dserver(
                     continue;
                 }
                 info!("accounts to scanning, {:?}", accounts_should_scan);
-                let blocks_to_scan = blocks_range(scan_start..scan_end.sequence + 1, PRIMARY_BATCH);
+                let blocks_to_scan =
+                    blocks_range(scan_start..scan_end.sequence + 1, N::PRIMARY_BATCH);
                 for group in blocks_to_scan {
-                    let blocks = match group.end <= LOCAL_BLOCKS_CHECKPOINT {
+                    let blocks = match group.end <= N::LOCAL_BLOCKS_CHECKPOINT {
                         true => schduler
                             .shared
                             .db_handler
@@ -288,7 +289,7 @@ pub async fn run_dserver(
                     None => {}
                 }
             }
-            sleep(RESCHEDULING_DURATION).await;
+            sleep(N::RESCHEDULING_DURATION).await;
         }
     });
     let _ = handler.await;

@@ -250,7 +250,7 @@ impl DBHandler for PgHandler {
 mod tests {
     use std::path::Path;
 
-    use constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
+    use params::{mainnet::Mainnet, network::Network};
     use sqlx::types::Json;
     use sqlx_db_tester::TestPg;
 
@@ -275,8 +275,8 @@ mod tests {
             name: address_to_name(ADDRESS),
             create_head: None,
             create_hash: None,
-            head: MAINNET_GENESIS_SEQUENCE,
-            hash: MAINNET_GENESIS_HASH.to_string(),
+            head: Mainnet::GENESIS_BLOCK_HEIGHT as i64,
+            hash: Mainnet::GENESIS_BLOCK_HASH.to_string(),
             in_vk: IN_VK.to_string(),
             out_vk: OUT_VK.to_string(),
             vk: VK.to_string(),
