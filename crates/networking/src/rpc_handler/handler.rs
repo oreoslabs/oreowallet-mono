@@ -18,7 +18,8 @@ use crate::{
         RpcSetAccountHeadRequest, RpcSetScanningRequest, SendTransactionRequest,
         SendTransactionResponse, TransactionStatus,
     },
-    rpc_handler::RpcError, stream::ResponseExt,
+    rpc_handler::RpcError,
+    stream::ResponseExt,
 };
 
 #[derive(Debug, Clone)]
@@ -43,7 +44,8 @@ impl RpcHandler {
         request: RpcImportAccountRequest,
     ) -> Result<RpcResponse<RpcImportAccountResponse>, OreoError> {
         let path = format!("http://{}/wallet/importAccount", self.endpoint);
-        let account_str = serde_json::to_string(&request).map_err(|_|OreoError::InternalRpcError("JSON serialization failed".to_string()))?;
+        let account_str = serde_json::to_string(&request)
+            .map_err(|_| OreoError::InternalRpcError("JSON serialization failed".to_string()))?;
         let resp = self
             .agent
             .clone()
@@ -144,13 +146,12 @@ impl RpcHandler {
     ) -> Result<RpcResponse<RpcGetTransactionsResponse>, OreoError> {
         let path = format!("http://{}/wallet/getAccountTransactions", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
-    
+
         match resp {
             Ok(response) => {
-                let transactions: Result<Vec<_>, OreoError> = response
-                    .into_stream::<TransactionStatus>()
-                    .collect();
-    
+                let transactions: Result<Vec<_>, OreoError> =
+                    response.into_stream::<TransactionStatus>().collect();
+
                 Ok(RpcResponse {
                     status: 200,
                     data: RpcGetTransactionsResponse {
@@ -209,7 +210,11 @@ impl RpcHandler {
             .agent
             .clone()
             .post(&path)
-            .send_json(RpcGetBlocksRequest { start, end, serialized: true });
+            .send_json(RpcGetBlocksRequest {
+                start,
+                end,
+                serialized: true,
+            });
         handle_response(resp)
     }
 

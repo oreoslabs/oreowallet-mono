@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use db_handler::{DBHandler, DbConfig, PgHandler};
 use dotenv::dotenv;
+use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use server::run_server;
 use utils::{handle_signals, initialize_logger};
 
@@ -24,6 +25,9 @@ pub struct Command {
     /// The scan server to connect to
     #[clap(long, default_value = "127.0.0.1:9093")]
     pub scan: String,
+    /// The network id, 0 for mainnet, 1 for testnet.
+    #[clap(long)]
+    pub network: u8,
 }
 
 #[tokio::main]
@@ -42,11 +46,20 @@ async fn main() -> Result<()> {
         verbosity,
         node,
         scan,
+        network,
     } = args;
     initialize_logger(verbosity);
     handle_signals().await?;
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
-    run_server(listen.into(), node, db_handler, scan, sk_u8, pk_u8).await?;
+    match network {
+        Mainnet::ID => {
+            run_server::<Mainnet>(listen.into(), node, db_handler, scan, sk_u8, pk_u8).await?;
+        }
+        Testnet::ID => {
+            run_server::<Testnet>(listen.into(), node, db_handler, scan, sk_u8, pk_u8).await?;
+        }
+        _ => panic!("Invalid network used"),
+    }
     Ok(())
 }

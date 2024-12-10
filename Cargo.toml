@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "crates/networking",
-    "crates/constants",
     "crates/db_handler",
     "crates/oreo_errors",
     "crates/server",

@@ -13,4 +13,4 @@ tracing = "0.1.40"
 utils = { path = "../utils" }
 networking = { path = "../networking" }
 db_handler = { path = "../db_handler" }
-constants = { path = "../constants" }
+params = { path = "../params" }

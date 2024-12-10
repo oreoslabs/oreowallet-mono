@@ -729,10 +729,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
 
 [[package]]
-name = "constants"
-version = "0.1.0"
-
-[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1043,13 +1039,13 @@ dependencies = [
  "bincode",
  "bytes",
  "clap",
- "constants",
  "db_handler",
  "dotenv",
  "futures",
  "hex",
  "networking",
  "oreo_errors",
+ "params",
  "priority-queue",
  "rayon",
  "serde",
@@ -1069,7 +1065,6 @@ dependencies = [
  "anyhow",
  "bytes",
  "clap",
- "constants",
  "db_handler",
  "futures",
  "gethostname",
@@ -2301,9 +2296,9 @@ dependencies = [
  "anyhow",
  "axum",
  "bytes",
- "constants",
  "db_handler",
  "oreo_errors",
+ "params",
  "serde",
  "serde_json",
  "tokio",
@@ -2762,7 +2757,6 @@ dependencies = [
  "blst",
  "blstrs",
  "clap",
- "constants",
  "db_handler",
  "getrandom",
  "ironfish",
@@ -3263,12 +3257,12 @@ dependencies = [
  "axum-extra",
  "bincode",
  "clap",
- "constants",
  "db_handler",
  "dotenv",
  "hex",
  "networking",
  "oreo_errors",
+ "params",
  "serde_json",
  "sha2 0.10.8",
  "tokio",
@@ -4015,9 +4009,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "constants",
  "db_handler",
  "networking",
+ "params",
  "tokio",
  "tracing",
  "utils",

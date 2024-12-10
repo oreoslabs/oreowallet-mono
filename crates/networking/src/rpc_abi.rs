@@ -1,5 +1,5 @@
 use axum::{response::IntoResponse, Json};
-use constants::IRON_NATIVE_ASSET;
+use params::network::Network;
 use serde::{Deserialize, Serialize};
 use ureq::json;
 
@@ -13,7 +13,7 @@ pub struct RpcResponse<T> {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RpcResponseStream<T> {
-    pub data: T
+    pub data: T,
 }
 
 impl<T: Serialize> IntoResponse for RpcResponse<T> {
@@ -144,14 +144,14 @@ pub struct RpcGetBalancesResponse {
 }
 
 impl RpcGetBalancesResponse {
-    pub fn verified_asset(base: Self) -> Self {
+    pub fn verified_asset<N: Network>(base: Self) -> Self {
         Self {
             balances: base
                 .balances
                 .into_iter()
                 .filter(|x| {
                     x.asset_verification.status == "verified".to_string()
-                        || x.asset_id == IRON_NATIVE_ASSET
+                        || x.asset_id == N::NATIVE_ASSET_ID.to_string()
                         || x.asset_name
                             == "6f7265736372697074696f6e7300000000000000000000000000000000000000"
                                 .to_string()
@@ -161,13 +161,13 @@ impl RpcGetBalancesResponse {
         }
     }
 
-    pub async fn ores(base: Self) -> Vec<Ores> {
+    pub async fn ores<N: Network>(base: Self) -> Vec<Ores> {
         let mut result = vec![];
         for asset in base.balances.iter() {
-            if !is_ores_local(asset) {
+            if !is_ores_local::<N>(asset) {
                 continue;
             }
-            if let Ok(ores) = get_ores(&asset.asset_id).await {
+            if let Ok(ores) = get_ores::<N>(&asset.asset_id).await {
                 result.push(ores);
             }
         }
@@ -186,10 +186,10 @@ pub struct OutPut {
 }
 
 impl OutPut {
-    pub fn from(base: OutPut) -> Self {
+    pub fn from<N: Network>(base: OutPut) -> Self {
         let memo = Some(base.memo.unwrap_or("".into()));
         let memo_hex = Some(base.memo_hex.unwrap_or("".into()));
-        let asset_id = Some(base.asset_id.unwrap_or(IRON_NATIVE_ASSET.into()));
+        let asset_id = Some(base.asset_id.unwrap_or(N::NATIVE_ASSET_ID.into()));
         Self {
             memo,
             memo_hex,

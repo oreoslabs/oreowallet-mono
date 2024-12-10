@@ -5,6 +5,7 @@ use clap::Parser;
 use db_handler::{DBHandler, DbConfig, PgHandler};
 use dotenv::dotenv;
 use dservice::run_dserver;
+use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use utils::{handle_signals, initialize_logger};
 
 #[derive(Parser, Debug, Clone)]
@@ -27,6 +28,9 @@ pub struct Command {
     /// The server to connect to
     #[clap(short, long, default_value = "127.0.0.1:9093")]
     pub server: String,
+    /// The network id, 0 for mainnet, 1 for testnet.
+    #[clap(long)]
+    pub network: u8,
 }
 
 #[tokio::main]
@@ -46,20 +50,38 @@ async fn main() -> Result<()> {
         dbconfig,
         node,
         server,
+        network,
     } = args;
     initialize_logger(verbosity);
     handle_signals().await?;
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
-    run_dserver(
-        dlisten.into(),
-        restful.into(),
-        node,
-        db_handler,
-        server,
-        sk_u8,
-        pk_u8,
-    )
-    .await?;
+    match network {
+        Mainnet::ID => {
+            run_dserver::<Mainnet>(
+                dlisten.into(),
+                restful.into(),
+                node,
+                db_handler,
+                server,
+                sk_u8,
+                pk_u8,
+            )
+            .await?;
+        }
+        Testnet::ID => {
+            run_dserver::<Testnet>(
+                dlisten.into(),
+                restful.into(),
+                node,
+                db_handler,
+                server,
+                sk_u8,
+                pk_u8,
+            )
+            .await?;
+        }
+        _ => panic!("Invalid network used"),
+    }
     Ok(())
 }

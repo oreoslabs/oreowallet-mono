@@ -15,6 +15,7 @@ use tracing::info;
 use crate::handlers::{generate_proof_handler, health_check_handler};
 
 pub mod handlers;
+pub const MAX_SPEND_PROOFS: usize = 15;
 
 pub async fn run_prover(listen: SocketAddr) -> anyhow::Result<()> {
     let router = Router::new()
