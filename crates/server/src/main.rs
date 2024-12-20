@@ -6,7 +6,7 @@ use db_handler::{DBHandler, DbConfig, PgHandler};
 use dotenv::dotenv;
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use server::run_server;
-use utils::{handle_signals, initialize_logger};
+use utils::{handle_signals, initialize_logger, EnvFilter};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Command {
@@ -48,7 +48,10 @@ async fn main() -> Result<()> {
         scan,
         network,
     } = args;
-    initialize_logger(verbosity);
+    let filter = EnvFilter::from_default_env()
+        .add_directive("ureq=off".parse().unwrap())
+        .add_directive("rustls=off".parse().unwrap());
+    initialize_logger(verbosity, filter);
     handle_signals().await?;
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);

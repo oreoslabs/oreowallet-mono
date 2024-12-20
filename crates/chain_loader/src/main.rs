@@ -3,7 +3,7 @@ use chain_loader::load_checkpoint;
 use clap::Parser;
 use db_handler::{DBHandler, DbConfig, PgHandler};
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
-use utils::initialize_logger;
+use utils::{initialize_logger, EnvFilter};
 
 #[derive(Parser, Debug, Clone)]
 struct Command {
@@ -30,7 +30,8 @@ async fn main() -> Result<()> {
         node,
         network,
     } = args;
-    initialize_logger(verbosity);
+    let filter = EnvFilter::from_default_env();
+    initialize_logger(verbosity, filter);
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);
     match network {
