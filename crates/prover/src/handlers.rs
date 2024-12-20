@@ -7,14 +7,14 @@ use oreo_errors::OreoError;
 use rand::thread_rng;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde_json::json;
-use tracing::debug;
+use tracing::info;
 
 use crate::MAX_SPEND_PROOFS;
 
 pub async fn generate_proof_handler(
     extract::Json(request): extract::Json<GenerateProofRequest>,
 ) -> impl IntoResponse {
-    debug!("calling generate_proof_handler");
+    info!("New proof generation task");
     let spend_proofs_needed = request.spend_circuits.len();
     if spend_proofs_needed >= MAX_SPEND_PROOFS {
         return OreoError::TooManyProofs.into_response();
@@ -111,7 +111,7 @@ pub async fn generate_proof_handler(
         output_proofs,
         mint_asset_proofs,
     };
-
+    info!("New proof generated");
     Json(json!({"code": 200, "data": proof})).into_response()
 }
 

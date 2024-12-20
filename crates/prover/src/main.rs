@@ -3,22 +3,25 @@ use std::net::SocketAddr;
 use anyhow::Result;
 use clap::Parser;
 use prover::run_prover;
-use utils::initialize_logger;
+use tracing::info;
+use utils::{initialize_logger, EnvFilter};
 
 #[derive(Parser, Debug, Clone)]
 pub struct Prover {
-    /// The ip:port server will listen on
+    /// The ip:port prover will listen on
     #[clap(short, long, default_value = "0.0.0.0:10002")]
-    pub listen: SocketAddr,
-    /// Set your logger level
+    listen: SocketAddr,
+    /// Set prover logger level
     #[clap(short, long, default_value = "0")]
-    pub verbosity: u8,
+    verbosity: u8,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let prover = Prover::parse();
-    initialize_logger(prover.verbosity);
-    run_prover(prover.listen.into()).await?;
+    let filter = EnvFilter::from_default_env().add_directive("bellperson=off".parse().unwrap());
+    initialize_logger(prover.verbosity, filter);
+    info!("Prover starts {:?}", prover);
+    run_prover(prover.listen).await?;
     Ok(())
 }

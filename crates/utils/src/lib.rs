@@ -7,7 +7,7 @@ use secp256k1::{
 };
 use tokio::sync::oneshot;
 use tracing::{info, warn};
-use tracing_subscriber::EnvFilter;
+pub use tracing_subscriber::EnvFilter;
 
 pub use secp256k1::ecdsa::Signature;
 
@@ -30,18 +30,14 @@ pub async fn handle_signals() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn initialize_logger(verbosity: u8) {
+pub fn initialize_logger(verbosity: u8, filter: EnvFilter) {
     match verbosity {
         0 => std::env::set_var("RUST_LOG", "info"),
         1 => std::env::set_var("RUST_LOG", "debug"),
         2 | 3 | 4 => std::env::set_var("RUST_LOG", "trace"),
         _ => std::env::set_var("RUST_LOG", "info"),
     };
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::from_default_env().add_directive("ironfish-server=info".parse().unwrap()),
-        )
-        .init();
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 }
 
 pub fn blocks_range(blocks: Range<u64>, batch: u64) -> Vec<Range<u64>> {

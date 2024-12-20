@@ -7,7 +7,7 @@ use networking::{
 };
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use tracing::info;
-use utils::{handle_signals, initialize_logger};
+use utils::{handle_signals, initialize_logger, EnvFilter};
 #[derive(Parser, Debug, Clone)]
 pub struct Command {
     /// The path to db config file
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
         bonus,
         network,
     } = cli;
-    initialize_logger(verbosity);
+    initialize_logger(verbosity, EnvFilter::from_default_env());
     handle_signals().await?;
     let db_config = DbConfig::load(dbconfig).unwrap();
     let db_handler = PgHandler::from_config(&db_config);

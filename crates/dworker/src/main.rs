@@ -4,7 +4,7 @@ use dworker::start_worker;
 use rand::Rng;
 use std::net::SocketAddr;
 use tracing::info;
-use utils::{handle_signals, initialize_logger};
+use utils::{handle_signals, initialize_logger, EnvFilter};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -23,7 +23,7 @@ struct Cli {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut args = Cli::parse();
-    initialize_logger(args.verbosity);
+    initialize_logger(args.verbosity, EnvFilter::from_default_env());
     handle_signals().await?;
     if args.name.is_none() {
         args.name = Some(
