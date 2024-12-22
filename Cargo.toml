@@ -10,6 +10,5 @@ members = [
     "crates/dworker",
     "crates/dservice",
     "crates/chain_loader", 
-    "crates/transfer-tool", 
     "crates/params",
 ]
