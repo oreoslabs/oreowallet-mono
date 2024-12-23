@@ -18,7 +18,7 @@ use axum::{
     routing::{get, post},
     BoxError, Router,
 };
-use db_handler::{DBHandler, PgHandler};
+use db_handler::DBHandler;
 use networking::{rpc_abi::BlockInfo, rpc_handler::RpcHandler, server_handler::ServerHandler};
 use tokio::net::TcpListener;
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
@@ -40,20 +40,22 @@ pub struct SecpKey {
     pub pk: [u8; 33],
 }
 
-#[derive(Debug, Clone)]
-pub struct SharedState<T: DBHandler> {
-    pub db_handler: T,
+pub struct SharedState {
+    pub db_handler: Box<dyn Send + Sync + DBHandler>,
     pub rpc_handler: RpcHandler,
     pub scan_handler: ServerHandler,
     pub secp: SecpKey,
     pub network: u8,
 }
 
-impl<T> SharedState<T>
-where
-    T: DBHandler,
-{
-    pub fn new(db_handler: T, endpoint: &str, scan: &str, secp: SecpKey, network: u8) -> Self {
+impl SharedState {
+    pub fn new(
+        db_handler: Box<dyn DBHandler + Send + Sync>,
+        endpoint: &str,
+        scan: &str,
+        secp: SecpKey,
+        network: u8,
+    ) -> Self {
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
@@ -88,16 +90,16 @@ where
     }
 }
 
+unsafe impl Send for SharedState {}
+unsafe impl Sync for SharedState {}
+
 // Authentication middleware function
-pub async fn auth<T: DBHandler>(
-    State(shared_state): State<Arc<SharedState<T>>>,
+pub async fn auth(
+    State(shared_state): State<Arc<SharedState>>,
     TypedHeader(Authorization(basic)): TypedHeader<Authorization<Basic>>,
     req: Request<Body>,
     next: Next,
-) -> impl IntoResponse
-where
-    T: DBHandler + Send + Sync + 'static,
-{
+) -> impl IntoResponse {
     match shared_state
         .db_handler
         .get_account(basic.username().to_string())
@@ -123,7 +125,7 @@ where
 pub async fn run_server<N: Network>(
     listen: SocketAddr,
     rpc_server: String,
-    db_handler: PgHandler,
+    db_handler: Box<dyn DBHandler + Send + Sync>,
     scan: String,
     sk_u8: [u8; 32],
     pk_u8: [u8; 33],

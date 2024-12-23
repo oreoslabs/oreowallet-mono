@@ -15,7 +15,7 @@ use axum::{
     routing::post,
     BoxError, Json, Router,
 };
-use db_handler::{DBHandler, InnerBlock, PgHandler};
+use db_handler::{DBHandler, InnerBlock};
 use manager::{AccountInfo, Manager, SecpKey, ServerMessage, SharedState, TaskInfo};
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest, SuccessResponse},
@@ -106,7 +106,7 @@ pub async fn run_dserver<N: Network>(
     dlisten: SocketAddr,
     restful: SocketAddr,
     rpc_server: String,
-    db_handler: PgHandler,
+    db_handler: Box<dyn Send + Sync + DBHandler>,
     server: String,
     sk_u8: [u8; 32],
     pk_u8: [u8; 33],

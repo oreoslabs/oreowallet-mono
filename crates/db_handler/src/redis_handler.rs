@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use substring::Substring;
 use tracing::info;
 
-use crate::{config::DbConfig, Account, DBHandler, InnerBlock};
+use crate::{Account, DBHandler, InnerBlock};
 
 pub const REDIS_ACCOUNT_KEY: &str = "IRONACCOUNT";
 pub const REDIS_ACCOUNT_KEY_V1: &str = "IRONACCOUNTV1";
@@ -69,6 +69,10 @@ impl RedisClient {
 
 #[async_trait::async_trait]
 impl DBHandler for RedisClient {
+    fn db_type(&self) -> String {
+        "Redis".to_string()
+    }
+
     async fn save_account(&self, account: Account, _worker_id: u32) -> Result<String, OreoError> {
         let address = account.address.clone();
         match self.hget(&self.db_name, &address).await {
@@ -148,16 +152,14 @@ impl DBHandler for RedisClient {
     async fn get_blocks(&self, _start: i64, _end: i64) -> Result<Vec<InnerBlock>, OreoError> {
         unimplemented!("Redis is deprecated for such feature!")
     }
-
-    fn from_config(config: &DbConfig) -> Self {
-        info!("Redis handler selected");
-        RedisClient::connect(&config.server_url(), config.default_pool_size).unwrap()
-    }
 }
 
 pub fn address_to_name(address: &str) -> String {
     address.substring(0, 10).into()
 }
+
+unsafe impl Send for RedisClient {}
+unsafe impl Sync for RedisClient {}
 
 #[cfg(test)]
 mod tests {
@@ -173,8 +175,7 @@ mod tests {
     use oreo_errors::OreoError;
 
     use super::address_to_name;
-    use super::RedisClient;
-    use crate::config::DbConfig;
+    use crate::load_db;
     use crate::Account;
     use crate::DBHandler;
     use params::{mainnet::Mainnet, network::Network};
@@ -199,10 +200,8 @@ mod tests {
         }
     }
 
-    fn get_tdb() -> RedisClient {
-        let config = DbConfig::load("./fixtures/redis-config.yml").unwrap();
-        let db_handler = RedisClient::from_config(&config);
-        db_handler
+    fn get_tdb() -> Box<dyn DBHandler + Send + Sync> {
+        load_db("./fixtures/redis-config.yml").unwrap()
     }
 
     #[tokio::test]

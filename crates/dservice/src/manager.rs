@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::Result;
-use db_handler::{DBHandler, PgHandler};
+use db_handler::DBHandler;
 use futures::{SinkExt, StreamExt};
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest},
@@ -97,19 +97,23 @@ pub struct SecpKey {
     pub pk: [u8; 33],
 }
 
-#[derive(Debug, Clone)]
-pub struct SharedState<T: DBHandler> {
-    pub db_handler: T,
+pub struct SharedState {
+    pub db_handler: Box<dyn Send + Sync + DBHandler>,
     pub rpc_handler: RpcHandler,
     pub server_handler: ServerHandler,
     pub secp_key: SecpKey,
 }
 
-impl<T> SharedState<T>
-where
-    T: DBHandler,
-{
-    pub fn new(db_handler: T, endpoint: &str, server: &str, secp_key: SecpKey) -> Self {
+unsafe impl Send for SharedState {}
+unsafe impl Sync for SharedState {}
+
+impl SharedState {
+    pub fn new(
+        db_handler: Box<dyn Send + Sync + DBHandler>,
+        endpoint: &str,
+        server: &str,
+        secp_key: SecpKey,
+    ) -> Self {
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
@@ -119,19 +123,18 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct Manager {
     pub workers: Arc<RwLock<HashMap<String, ServerWorker>>>,
     pub task_queue: Arc<RwLock<PriorityQueue<DRequest, Reverse<i64>>>>,
     pub task_mapping: Arc<RwLock<HashMap<String, TaskInfo>>>,
     pub account_mappling: Arc<RwLock<HashMap<String, AccountInfo>>>,
-    pub shared: Arc<SharedState<PgHandler>>,
+    pub shared: Arc<SharedState>,
     pub accounts_to_scan: Arc<RwLock<Vec<ScanRequest>>>,
     pub network: u8,
 }
 
 impl Manager {
-    pub fn new(shared: Arc<SharedState<PgHandler>>, network: u8) -> Arc<Self> {
+    pub fn new(shared: Arc<SharedState>, network: u8) -> Arc<Self> {
         Arc::new(Self {
             workers: Arc::new(RwLock::new(HashMap::new())),
             task_queue: Arc::new(RwLock::new(PriorityQueue::new())),

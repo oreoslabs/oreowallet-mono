@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use anyhow::Result;
 use clap::Parser;
-use db_handler::{DBHandler, DbConfig, PgHandler};
+use db_handler::load_db;
 use dotenv::dotenv;
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use server::run_server;
@@ -53,8 +53,7 @@ async fn main() -> Result<()> {
         .add_directive("rustls=off".parse().unwrap());
     initialize_logger(verbosity, filter);
     handle_signals().await?;
-    let db_config = DbConfig::load(dbconfig).unwrap();
-    let db_handler = PgHandler::from_config(&db_config);
+    let db_handler = load_db(dbconfig).unwrap();
     match network {
         Mainnet::ID => {
             run_server::<Mainnet>(listen.into(), node, db_handler, scan, sk_u8, pk_u8).await?;

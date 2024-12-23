@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::Result;
 use clap::Parser;
-use db_handler::{DBHandler, DBTransaction, DbConfig, InnerBlock, Json, PgHandler};
+use db_handler::{load_db, DBTransaction, InnerBlock, Json};
 use networking::{rpc_abi::RpcBlock, rpc_handler::RpcHandler};
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use tokio::{sync::oneshot, time::sleep};
@@ -43,10 +43,7 @@ impl ChainLoader {
             panic!("Genesis block doesn't match");
         }
 
-        let db_handler = {
-            let db_config = DbConfig::load(self.dbconfig.clone()).unwrap();
-            PgHandler::from_config(&db_config)
-        };
+        let db_handler = { load_db(self.dbconfig.clone()).unwrap() };
 
         for group in blocks_range(1..N::LOCAL_BLOCKS_CHECKPOINT + 1, N::PRIMARY_BATCH) {
             if shut_down.load(Ordering::Relaxed) {

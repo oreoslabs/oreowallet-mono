@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use anyhow::Result;
 use clap::Parser;
-use db_handler::{DBHandler, DbConfig, PgHandler};
+use db_handler::load_db;
 use dotenv::dotenv;
 use dservice::run_dserver;
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
@@ -54,8 +54,7 @@ async fn main() -> Result<()> {
     } = args;
     initialize_logger(verbosity, EnvFilter::from_default_env());
     handle_signals().await?;
-    let db_config = DbConfig::load(dbconfig).unwrap();
-    let db_handler = PgHandler::from_config(&db_config);
+    let db_handler = load_db(dbconfig).unwrap();
     match network {
         Mainnet::ID => {
             run_dserver::<Mainnet>(
