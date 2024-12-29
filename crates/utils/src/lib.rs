@@ -30,13 +30,16 @@ pub async fn handle_signals() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn initialize_logger(verbosity: u8, filter: EnvFilter) {
+pub fn initialize_logger(verbosity: u8) {
     match verbosity {
         0 => std::env::set_var("RUST_LOG", "info"),
         1 => std::env::set_var("RUST_LOG", "debug"),
         2 | 3 | 4 => std::env::set_var("RUST_LOG", "trace"),
         _ => std::env::set_var("RUST_LOG", "info"),
     };
+}
+
+pub fn initialize_logger_filter(filter: EnvFilter) {
     tracing_subscriber::fmt().with_env_filter(filter).init();
 }
 

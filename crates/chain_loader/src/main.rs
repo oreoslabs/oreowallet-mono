@@ -13,7 +13,7 @@ use networking::{rpc_abi::RpcBlock, rpc_handler::RpcHandler};
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use tokio::{sync::oneshot, time::sleep};
 use tracing::{error, info};
-use utils::{blocks_range, initialize_logger, EnvFilter};
+use utils::{blocks_range, initialize_logger, initialize_logger_filter, EnvFilter};
 
 #[derive(Parser, Debug, Clone)]
 struct ChainLoader {
@@ -109,8 +109,8 @@ impl ChainLoader {
 #[tokio::main]
 async fn main() -> Result<()> {
     let loader = ChainLoader::parse();
-    let filter = EnvFilter::from_default_env();
-    initialize_logger(loader.verbosity, filter);
+    initialize_logger(loader.verbosity);
+    initialize_logger_filter(EnvFilter::from_default_env());
     let shut_down = Arc::new(AtomicBool::new(false));
     handle_signals(shut_down.clone()).await;
     match loader.network {
