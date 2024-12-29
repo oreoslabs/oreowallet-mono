@@ -38,12 +38,13 @@ pub async fn scheduling_tasks(
     blocks: Vec<InnerBlock>,
 ) -> anyhow::Result<()> {
     for account in accounts.iter() {
-        if let Some(account_info) = scheduler
+        let account_info_maybe = scheduler
             .account_mappling
             .read()
             .await
             .get(&account.address)
-        {
+            .cloned();
+        if let Some(account_info) = account_info_maybe {
             debug!(
                 "start scanning {} blocks for account {:?}",
                 blocks.len(),
@@ -254,6 +255,7 @@ pub async fn run_dserver<N: Network>(
     tokio::spawn(async move {
         let _ = router.send(());
         loop {
+            let mut keys_to_reschedule = vec![];
             for key in secondary
                 .task_mapping
                 .read()
@@ -262,32 +264,68 @@ pub async fn run_dserver<N: Network>(
                 .filter(|(_k, v)| v.since.elapsed().as_secs() >= 600)
                 .map(|(k, _)| k.to_string())
             {
-                info!("rescheduling task: {:?}", key);
-                match secondary.task_mapping.write().await.remove(&key) {
-                    Some(task_info) => {
-                        let address = task_info.address.to_string();
-                        let sequence = task_info.sequence;
-                        if let Some(account) = secondary.account_mappling.read().await.get(&address)
-                        {
-                            if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence) {
-                                let block = block.data.block.to_inner();
-                                let _ = scheduling_tasks(
-                                    secondary.clone(),
-                                    &vec![ScanRequest {
-                                        address: address.clone(),
-                                        in_vk: account.in_vk.clone(),
-                                        out_vk: account.out_vk.clone(),
-                                        head: Some(account.start_block.clone()),
-                                    }],
-                                    vec![block],
-                                )
-                                .await
-                                .unwrap();
+                keys_to_reschedule.push(key);
+            }
+            let keys_count = keys_to_reschedule.len();
+            if keys_count > 0 {
+                info!("Rescheduling {} tasks", keys_count);
+            }
+            let mut tasks_to_resechedule = vec![];
+            for key in keys_to_reschedule {
+                let key_maybe = secondary.task_mapping.write().await.remove(&key).clone();
+                if let Some(task_info) = key_maybe {
+                    let address = task_info.address.to_string();
+                    let sequence = task_info.sequence;
+                    let address_maybe = secondary
+                        .account_mappling
+                        .read()
+                        .await
+                        .get(&address)
+                        .cloned();
+                    if let Some(account) = address_maybe {
+                        if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence) {
+                            let block = block.data.block.to_inner();
+                            tasks_to_resechedule.push((
+                                vec![ScanRequest {
+                                    address: address.clone(),
+                                    in_vk: account.in_vk.clone(),
+                                    out_vk: account.out_vk.clone(),
+                                    head: Some(account.start_block.clone()),
+                                }],
+                                vec![block],
+                            ));
+                            if tasks_to_resechedule.len() % 500 == 0 {
+                                info!(
+                                    "Tasks to reschedule len now {:?}",
+                                    tasks_to_resechedule.len()
+                                );
+                            }
+                            // We dont want to reschedule so many tasks at once
+                            if tasks_to_resechedule.len() >= 20000 {
+                                break;
                             }
                         }
                     }
-                    None => {}
                 }
+            }
+            if !tasks_to_resechedule.is_empty() {
+                info!(
+                    "Done prepping tasks to be rescheduled.. now rescheduling {:?}",
+                    tasks_to_resechedule.len()
+                );
+            }
+            let mut count = 0;
+            for (scan_request, blocks) in tasks_to_resechedule {
+                scheduling_tasks(secondary.clone(), &scan_request, blocks)
+                    .await
+                    .unwrap();
+                if count % 1000 == 0 {
+                    info!("Rescheduled tasks so far {:?}", count);
+                }
+                count += 1;
+            }
+            if count > 0 {
+                info!("Done rescheduling {:?} tasks", count);
             }
             sleep(N::RESCHEDULING_DURATION).await;
         }

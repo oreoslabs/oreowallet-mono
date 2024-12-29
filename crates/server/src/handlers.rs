@@ -251,16 +251,6 @@ pub async fn update_scan_status_handler(
                 return e.into_response();
             }
             let account = db_account.unwrap();
-            let reset_created_at =
-                account.create_head.is_none() || account.create_head.unwrap() == 1;
-            let reset = shared.rpc_handler.reset_account(RpcResetAccountRequest {
-                account: account.name.clone(),
-                reset_scanning_enabled: Some(false),
-                reset_created_at: Some(reset_created_at),
-            });
-            if let Err(e) = reset {
-                return e.into_response();
-            }
             message.account = account.name.clone();
             let resp = shared.rpc_handler.set_account_head(message.clone());
 

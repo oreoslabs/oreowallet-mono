@@ -255,7 +255,7 @@ impl Manager {
                                     },
                                     DMessage::DRequest(_) => {
                                         error!("invalid message from worker, should never happen");
-                                        let _ = worker_server.workers.write().await.remove(&worker_name).unwrap();
+                                        let _ = worker_server.workers.write().await.remove(&worker_name);
                                         break;
                                     },
                                     DMessage::DResponse(response) => {
@@ -273,7 +273,7 @@ impl Manager {
                             },
                             _ => {
                                 warn!("unknown message");
-                                let _ = worker_server.workers.write().await.remove(&worker_name).unwrap();
+                                let _ = worker_server.workers.write().await.remove(&worker_name);
                                 break;
                             },
                         }
@@ -293,10 +293,11 @@ impl Manager {
         let mut latest_scanned_block = self.genesis_block();
         match self.account_mappling.write().await.get_mut(&address) {
             Some(account) => {
-                if let Some(task_info) = self.task_mapping.read().await.get(&task_id) {
+                let maybe_task = self.task_mapping.read().await.get(&task_id).cloned();
+                if let Some(task_info) = maybe_task {
                     let block_hash = task_info.hash.to_string();
                     if !response.data.is_empty() {
-                        info!("account info: {:?}", account);
+                        debug!("account info: {:?}", account);
                         info!("new available block {} for account {}", block_hash, address);
                         account.blocks.insert(
                             block_hash,
