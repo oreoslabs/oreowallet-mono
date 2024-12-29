@@ -105,6 +105,14 @@ pub struct RpcSetAccountHeadRequest {
     pub scan_complete: bool,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RpcSetAccountHeadRequestV2 {
+    pub account: String,
+    pub start: String,
+    pub end: String,
+    pub blocks: Vec<BlockWithHash>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RpcResetAccountRequest {

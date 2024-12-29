@@ -309,7 +309,7 @@ impl Manager {
                         );
                     }
                     account.remaining_task -= 1;
-                    if account.remaining_task % 5000 == 0 {
+                    if account.remaining_task % 50000 == 0 {
                         update_account = true;
                     }
                     if task_info.sequence > latest_scanned_block.sequence as i64 {

@@ -195,17 +195,17 @@ pub async fn rescan_account_handler(
         .db_handler
         .update_scan_status(account.address.clone(), true)
         .await;
-    if let Ok(_) = shared
+    if let Ok(x) = shared
         .rpc_handler
         .get_account_status(RpcGetAccountStatusRequest {
             account: account.name.clone(),
         })
     {
         let genesis = shared.genesis().clone();
-        let head = BlockInfo {
-            hash: account.create_hash.unwrap_or(genesis.hash),
-            sequence: account.create_head.unwrap_or(genesis.sequence as i64) as u64,
-        };
+        let head = x.data.account.head.unwrap_or(BlockInfo {
+            hash: genesis.hash.clone(),
+            sequence: genesis.sequence,
+        });
         let scan_request = ScanRequest {
             address: account.address.clone(),
             in_vk: account.in_vk.clone(),
