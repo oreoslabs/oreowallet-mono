@@ -4,7 +4,7 @@ use crate::network::Network;
 pub struct Mainnet;
 
 impl Network for Mainnet {
-    const ID: u8 = 0;
+    const ID: u8 = 1;
 
     const NAME: &'static str = "mainnet";
 
