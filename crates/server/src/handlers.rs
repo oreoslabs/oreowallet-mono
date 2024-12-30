@@ -8,10 +8,11 @@ use axum::{
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest, ScanResponse, SuccessResponse},
     rpc_abi::{
-        BlockInfo, OutPut, RpcAddTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
-        RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
-        RpcGetTransactionsRequest, RpcImportAccountRequest, RpcImportAccountResponse,
-        RpcRemoveAccountRequest, RpcResetAccountRequest, RpcResponse, RpcSetScanningRequest,
+        BlockInfo, CreatedAt, OutPut, RpcAddTxRequest, RpcCreateTxRequest,
+        RpcGetAccountStatusRequest, RpcGetAccountTransactionRequest, RpcGetBalancesRequest,
+        RpcGetBalancesResponse, RpcGetTransactionsRequest, RpcImportAccountRequest,
+        RpcImportAccountResponse, RpcRemoveAccountRequest, RpcResetAccountRequest, RpcResponse,
+        RpcSetScanningRequest,
     },
     web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
 };
@@ -43,6 +44,12 @@ pub async fn import_account_handler(
         public_address,
         created_at,
     } = import;
+
+    let created_at = created_at.map(|created_at| CreatedAt {
+        hash: created_at.hash,
+        sequence: created_at.sequence,
+        network_id: shared.network(),
+    });
     let rpc_data = RpcImportAccountRequest {
         view_key,
         incoming_view_key: incoming_view_key.clone(),
