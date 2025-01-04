@@ -402,13 +402,24 @@ impl Manager {
                 message: set_account_head_request,
                 signature,
             };
-            match self.shared.server_handler.submit_scan_response(request) {
-                Ok(msg) => {
-                    if msg.success && account_info.end_block.hash == latest_scanned_block.hash {
-                        let _ = self.account_mappling.write().await.remove(&address);
-                    }
+            let mut retry = 0;
+            loop {
+                if retry == 3 {
+                    break;
                 }
-                Err(e) => error!("failed to submit decryption response to server, {:?}", e),
+                if let Err(e) = self
+                    .shared
+                    .server_handler
+                    .submit_scan_response(request.clone())
+                {
+                    error!("Submit scan result failed {}", e);
+                } else {
+                    break;
+                }
+                retry += 1;
+            }
+            if account_info.remaining_task == 0 {
+                let _ = self.account_mappling.write().await.remove(&address);
             }
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
