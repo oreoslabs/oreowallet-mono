@@ -70,7 +70,6 @@ pub struct AccountInfo {
     pub out_vk: String,
     // mapping from block_hash to transaction list in this block
     pub blocks: HashMap<String, Vec<TransactionWithHash>>,
-    pub latest_scanned: BlockInfo,
 }
 
 impl AccountInfo {
@@ -82,13 +81,12 @@ impl AccountInfo {
     ) -> Self {
         let remaining_task = end_block.sequence - start_block.sequence + 1;
         Self {
-            start_block: start_block.clone(),
+            start_block,
             end_block,
             remaining_task,
             in_vk,
             out_vk,
             blocks: HashMap::new(),
-            latest_scanned: start_block,
         }
     }
 }
@@ -290,7 +288,7 @@ impl Manager {
                                             false => {
                                                 let worker = ServerWorker::new(tx.clone());
                                                 worker_name = register.name;
-                                                debug!("new worker: {}", worker_name.clone());
+                                                info!("new worker: {}", worker_name.clone());
                                                 let _ = worker_server.workers.write().await.insert(worker_name.clone(), worker);
                                                 let data = worker_server.task_queue.write().await.pop();
                                                 match data {
@@ -357,14 +355,8 @@ impl Manager {
                         );
                     }
                     account.remaining_task -= 1;
-                    if account.remaining_task % 50000 == 0 {
+                    if account.remaining_task == 0 {
                         update_account = true;
-                    }
-                    if task_info.sequence > account.latest_scanned.sequence as i64 {
-                        account.latest_scanned = BlockInfo {
-                            hash: block_hash,
-                            sequence: task_info.sequence as u64,
-                        }
                     }
                 }
             }
@@ -383,8 +375,8 @@ impl Manager {
             let set_account_head_request = RpcSetAccountHeadRequest {
                 account: address.clone(),
                 start: account_info.start_block.hash,
-                end: account_info.latest_scanned.hash,
-                scan_complete: account_info.remaining_task == 0,
+                end: account_info.end_block.hash,
+                scan_complete: true,
                 blocks: account_info
                     .blocks
                     .iter()
@@ -419,9 +411,8 @@ impl Manager {
                 }
                 retry += 1;
             }
-            if account_info.remaining_task == 0 {
-                let _ = self.account_mappling.write().await.remove(&address);
-            }
+            info!("Scanning for account {} completed", address);
+            let _ = self.account_mappling.write().await.remove(&address);
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
         Ok(())
