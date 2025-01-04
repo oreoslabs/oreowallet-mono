@@ -70,6 +70,7 @@ pub struct AccountInfo {
     pub out_vk: String,
     // mapping from block_hash to transaction list in this block
     pub blocks: HashMap<String, Vec<TransactionWithHash>>,
+    pub latest_scanned: BlockInfo,
 }
 
 impl AccountInfo {
@@ -81,12 +82,13 @@ impl AccountInfo {
     ) -> Self {
         let remaining_task = end_block.sequence - start_block.sequence + 1;
         Self {
-            start_block,
+            start_block: start_block.clone(),
             end_block,
             remaining_task,
             in_vk,
             out_vk,
             blocks: HashMap::new(),
+            latest_scanned: start_block,
         }
     }
 }
@@ -337,7 +339,6 @@ impl Manager {
         let address = response.address.clone();
         let task_id = response.id.clone();
         let mut update_account = false;
-        let mut latest_scanned_block = self.genesis_block();
         match self.account_mappling.write().await.get_mut(&address) {
             Some(account) => {
                 let maybe_task = self.task_mapping.read().await.get(&task_id).cloned();
@@ -347,7 +348,7 @@ impl Manager {
                         debug!("account info: {:?}", account);
                         info!("new available block {} for account {}", block_hash, address);
                         account.blocks.insert(
-                            block_hash,
+                            block_hash.clone(),
                             response
                                 .data
                                 .into_iter()
@@ -359,11 +360,11 @@ impl Manager {
                     if account.remaining_task % 50000 == 0 {
                         update_account = true;
                     }
-                    if task_info.sequence > latest_scanned_block.sequence as i64 {
-                        latest_scanned_block = BlockInfo {
-                            hash: task_info.hash.clone(),
+                    if task_info.sequence > account.latest_scanned.sequence as i64 {
+                        account.latest_scanned = BlockInfo {
+                            hash: block_hash,
                             sequence: task_info.sequence as u64,
-                        };
+                        }
                     }
                 }
             }
@@ -381,8 +382,8 @@ impl Manager {
                 .clone();
             let set_account_head_request = RpcSetAccountHeadRequest {
                 account: address.clone(),
-                start: account_info.start_block.hash.to_string(),
-                end: latest_scanned_block.hash.clone(),
+                start: account_info.start_block.hash,
+                end: account_info.latest_scanned.hash,
                 scan_complete: account_info.remaining_task == 0,
                 blocks: account_info
                     .blocks
