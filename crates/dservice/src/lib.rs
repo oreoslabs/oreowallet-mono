@@ -26,7 +26,7 @@ use params::network::Network;
 use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use utils::{blocks_range, default_secp, verify, Signature};
 
 pub mod manager;
@@ -37,7 +37,7 @@ pub async fn scheduling_tasks(
     accounts: &Vec<ScanRequest>,
     blocks: Vec<InnerBlock>,
 ) -> anyhow::Result<()> {
-    for account in accounts.iter() {
+    for account in accounts {
         let account_info_maybe = scheduler
             .account_mappling
             .read()
@@ -120,36 +120,15 @@ pub async fn run_dserver<N: Network>(
     let manager = Manager::new(shared_resource, N::ID);
 
     if let Err(e) = Manager::initialize_networking(manager.clone(), dlisten).await {
-        error!("init networking server {}", e);
+        error!("Init networking server failed {}", e);
     }
 
-    // manager status updater
-    let status_manager = manager.clone();
-    let (router, handler) = oneshot::channel();
-    tokio::spawn(async move {
-        let _ = router.send(());
-        loop {
-            {
-                info!(
-                    "online workers: {}",
-                    status_manager.workers.read().await.len()
-                );
-                info!(
-                    "pending taskes in queue: {}",
-                    status_manager.task_queue.read().await.len()
-                );
-                info!(
-                    "pending account to scan: {:?}",
-                    status_manager.accounts_to_scan.read().await
-                );
-            }
-            sleep(Duration::from_secs(60)).await;
-        }
-    });
-    let _ = handler.await;
+    if let Err(e) = Manager::initialize_status_updater(manager.clone()).await {
+        error!("Init status updater failed {}", e);
+    }
 
     {
-        info!("warmup, wait for worker to join");
+        info!("Warmup, waiting for workers to join");
         sleep(Duration::from_secs(60)).await;
     }
 
@@ -192,6 +171,8 @@ pub async fn run_dserver<N: Network>(
                         .get(&account.address)
                         .is_some()
                     {
+                        // should never happen
+                        warn!("Unexpected duplicated account to scan {}", account.address);
                         continue;
                     }
                     let head = account.head.clone().unwrap();
@@ -210,7 +191,7 @@ pub async fn run_dserver<N: Network>(
                 if accounts_should_scan.is_empty() {
                     continue;
                 }
-                info!("accounts to scanning, {:?}", accounts_should_scan);
+                info!("accounts to scan, {:?}", accounts_should_scan);
                 let blocks_to_scan =
                     blocks_range(scan_start..scan_end.sequence + 1, N::PRIMARY_BATCH);
                 for group in blocks_to_scan {
@@ -274,7 +255,7 @@ pub async fn run_dserver<N: Network>(
             for key in keys_to_reschedule {
                 let key_maybe = secondary.task_mapping.write().await.remove(&key).clone();
                 if let Some(task_info) = key_maybe {
-                    let address = task_info.address.to_string();
+                    let address = task_info.address;
                     let sequence = task_info.sequence;
                     let address_maybe = secondary
                         .account_mappling
@@ -305,6 +286,8 @@ pub async fn run_dserver<N: Network>(
                                 break;
                             }
                         }
+                    } else {
+                        error!("Account info missed for exist task, account {}", address);
                     }
                 }
             }
@@ -382,7 +365,9 @@ pub async fn account_scanner_handler(
         &manager.shared.secp_key.pk,
     ) {
         if x {
-            let _ = manager.accounts_to_scan.write().await.push(message);
+            if !manager.should_skip_request(message.address.clone()).await {
+                let _ = manager.accounts_to_scan.write().await.push(message);
+            }
             return Json(SuccessResponse { success: true });
         }
     }

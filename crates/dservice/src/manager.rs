@@ -26,7 +26,7 @@ use tokio::{
         mpsc::{self, Sender},
         oneshot, RwLock,
     },
-    time::timeout,
+    time::{sleep, timeout},
 };
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::{debug, error, info, warn};
@@ -163,6 +163,53 @@ impl Manager {
         }
     }
 
+    pub async fn should_skip_request(&self, address: String) -> bool {
+        if self
+            .accounts_to_scan
+            .read()
+            .await
+            .iter()
+            .find(|account| account.address == address.clone())
+            .is_some()
+            || self.account_mappling.read().await.get(&address).is_some()
+        {
+            return true;
+        }
+        false
+    }
+
+    pub async fn initialize_status_updater(server: Arc<Self>) -> Result<()> {
+        let (router, handler) = oneshot::channel();
+        tokio::spawn(async move {
+            let _ = router.send(());
+            loop {
+                {
+                    info!("online workers: {}", server.workers.read().await.len());
+                    info!(
+                        "pending taskes in queue: {}",
+                        server.task_queue.read().await.len()
+                    );
+                    info!(
+                        "scanning tasks: {:?}",
+                        server.task_mapping.read().await.len()
+                    );
+                    info!(
+                        "pending account to scan: {:?}",
+                        server.accounts_to_scan.read().await
+                    );
+                    info!(
+                        "scanning accounts: {:?}",
+                        server.account_mappling.read().await
+                    );
+                }
+                sleep(Duration::from_secs(60)).await;
+            }
+        });
+        let _ = handler.await;
+        info!("Status updater installed!");
+        Ok(())
+    }
+
     pub async fn initialize_networking(server: Arc<Self>, addr: SocketAddr) -> Result<()> {
         let (router, handler) = oneshot::channel();
         let listener = TcpListener::bind(&addr).await?;
@@ -225,7 +272,7 @@ impl Manager {
                 tokio::select! {
                     _ = timer.tick() => {
                         debug!("no message from worker {} for 5 mins, exit", worker_name);
-                        let _ = worker_server.workers.write().await.remove(&worker_name).unwrap();
+                        let _ = worker_server.workers.write().await.remove(&worker_name);
                         break;
                     },
                     result = outbound_r.next() => {
@@ -295,7 +342,7 @@ impl Manager {
             Some(account) => {
                 let maybe_task = self.task_mapping.read().await.get(&task_id).cloned();
                 if let Some(task_info) = maybe_task {
-                    let block_hash = task_info.hash.to_string();
+                    let block_hash = task_info.hash.clone();
                     if !response.data.is_empty() {
                         debug!("account info: {:?}", account);
                         info!("new available block {} for account {}", block_hash, address);
