@@ -296,7 +296,12 @@ pub async fn get_balances_handler(
         confirmations: Some(get_balance.confirmations.unwrap_or(10)),
     });
     match resp {
-        Ok(res) => {
+        Ok(mut res) => {
+            for item in res.data.balances.iter_mut() {
+                if let Ok(asset) = shared.rpc_handler.get_asset(item.asset_id.clone()) {
+                    item.decimals = asset.data.verification.decimals;
+                }
+            }
             let data = match shared.network() {
                 Testnet::ID => RpcGetBalancesResponse::verified_asset::<Testnet>(res.data),
                 _ => RpcGetBalancesResponse::verified_asset::<Mainnet>(res.data),
