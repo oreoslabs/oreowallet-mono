@@ -5,14 +5,14 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use db_handler::DBHandler;
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest, ScanResponse, SuccessResponse},
     rpc_abi::{
-        BlockInfo, OutPut, RpcAddTxRequest, RpcCreateTxRequest, RpcGetAccountStatusRequest,
-        RpcGetAccountTransactionRequest, RpcGetBalancesRequest, RpcGetBalancesResponse,
-        RpcGetTransactionsRequest, RpcImportAccountRequest, RpcImportAccountResponse,
-        RpcRemoveAccountRequest, RpcResetAccountRequest, RpcResponse, RpcSetScanningRequest,
+        BlockInfo, CreatedAt, OutPut, RpcAddTxRequest, RpcCreateTxRequest,
+        RpcGetAccountStatusRequest, RpcGetAccountTransactionRequest, RpcGetBalancesRequest,
+        RpcGetBalancesResponse, RpcGetTransactionsRequest, RpcImportAccountRequest,
+        RpcImportAccountResponse, RpcRemoveAccountRequest, RpcResetAccountRequest, RpcResponse,
+        RpcSetScanningRequest,
     },
     web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
 };
@@ -24,8 +24,8 @@ use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;
 
-pub async fn import_account_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn import_account_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(import): extract::Json<ImportAccountRequest>,
 ) -> impl IntoResponse {
     let genesis = shared.genesis().clone();
@@ -44,6 +44,12 @@ pub async fn import_account_handler<T: DBHandler>(
         public_address,
         created_at,
     } = import;
+
+    let created_at = created_at.map(|created_at| CreatedAt {
+        hash: created_at.hash,
+        sequence: created_at.sequence,
+        network_id: shared.network(),
+    });
     let rpc_data = RpcImportAccountRequest {
         view_key,
         incoming_view_key: incoming_view_key.clone(),
@@ -111,8 +117,8 @@ pub async fn import_account_handler<T: DBHandler>(
     }
 }
 
-pub async fn remove_account_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn remove_account_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(remove_account): extract::Json<RpcRemoveAccountRequest>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -142,8 +148,8 @@ pub async fn remove_account_handler<T: DBHandler>(
     }
 }
 
-pub async fn account_status_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn account_status_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(account): extract::Json<RpcGetAccountStatusRequest>,
 ) -> impl IntoResponse {
     let db_account = shared.db_handler.get_account(account.account.clone()).await;
@@ -174,8 +180,8 @@ pub async fn account_status_handler<T: DBHandler>(
     .into_response()
 }
 
-pub async fn rescan_account_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn rescan_account_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(account): extract::Json<RpcGetAccountStatusRequest>,
 ) -> impl IntoResponse {
     let db_account = shared.db_handler.get_account(account.account.clone()).await;
@@ -196,17 +202,17 @@ pub async fn rescan_account_handler<T: DBHandler>(
         .db_handler
         .update_scan_status(account.address.clone(), true)
         .await;
-    if let Ok(_) = shared
+    if let Ok(x) = shared
         .rpc_handler
         .get_account_status(RpcGetAccountStatusRequest {
             account: account.name.clone(),
         })
     {
         let genesis = shared.genesis().clone();
-        let head = BlockInfo {
-            hash: account.create_hash.unwrap_or(genesis.hash),
-            sequence: account.create_head.unwrap_or(genesis.sequence as i64) as u64,
-        };
+        let head = x.data.account.head.unwrap_or(BlockInfo {
+            hash: genesis.hash.clone(),
+            sequence: genesis.sequence,
+        });
         let scan_request = ScanRequest {
             address: account.address.clone(),
             in_vk: account.in_vk.clone(),
@@ -229,8 +235,8 @@ pub async fn rescan_account_handler<T: DBHandler>(
     .into_response()
 }
 
-pub async fn update_scan_status_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn update_scan_status_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(response): extract::Json<DecryptionMessage<ScanResponse>>,
 ) -> impl IntoResponse {
     let DecryptionMessage {
@@ -252,16 +258,6 @@ pub async fn update_scan_status_handler<T: DBHandler>(
                 return e.into_response();
             }
             let account = db_account.unwrap();
-            let reset_created_at =
-                account.create_head.is_none() || account.create_head.unwrap() == 1;
-            let reset = shared.rpc_handler.reset_account(RpcResetAccountRequest {
-                account: account.name.clone(),
-                reset_scanning_enabled: Some(false),
-                reset_created_at: Some(reset_created_at),
-            });
-            if let Err(e) = reset {
-                return e.into_response();
-            }
             message.account = account.name.clone();
             let resp = shared.rpc_handler.set_account_head(message.clone());
 
@@ -284,8 +280,8 @@ pub async fn update_scan_status_handler<T: DBHandler>(
     Json(SuccessResponse { success: false }).into_response()
 }
 
-pub async fn get_balances_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn get_balances_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(get_balance): extract::Json<RpcGetBalancesRequest>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -312,8 +308,8 @@ pub async fn get_balances_handler<T: DBHandler>(
     }
 }
 
-pub async fn get_ores_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn get_ores_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(get_balance): extract::Json<RpcGetBalancesRequest>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -340,8 +336,8 @@ pub async fn get_ores_handler<T: DBHandler>(
     }
 }
 
-pub async fn get_transaction_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn get_transaction_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(account): extract::Json<RpcGetAccountTransactionRequest>,
 ) -> impl IntoResponse {
     let db_account = shared.db_handler.get_account(account.account.clone()).await;
@@ -372,8 +368,8 @@ pub async fn get_transaction_handler<T: DBHandler>(
     }
 }
 
-pub async fn get_transactions_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn get_transactions_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(get_transactions): extract::Json<RpcGetTransactionsRequest>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -393,8 +389,8 @@ pub async fn get_transactions_handler<T: DBHandler>(
         .into_response()
 }
 
-pub async fn create_transaction_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn create_transaction_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(create_transaction): extract::Json<RpcCreateTxRequest>,
 ) -> impl IntoResponse {
     let db_account = shared
@@ -435,8 +431,8 @@ pub async fn create_transaction_handler<T: DBHandler>(
         .into_response()
 }
 
-pub async fn add_transaction_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
+pub async fn add_transaction_handler(
+    State(shared): State<Arc<SharedState>>,
     extract::Json(broadcast_transaction): extract::Json<RpcAddTxRequest>,
 ) -> impl IntoResponse {
     shared
@@ -445,9 +441,7 @@ pub async fn add_transaction_handler<T: DBHandler>(
         .into_response()
 }
 
-pub async fn latest_block_handler<T: DBHandler>(
-    State(shared): State<Arc<SharedState<T>>>,
-) -> impl IntoResponse {
+pub async fn latest_block_handler(State(shared): State<Arc<SharedState>>) -> impl IntoResponse {
     shared.rpc_handler.get_latest_block().into_response()
 }
 

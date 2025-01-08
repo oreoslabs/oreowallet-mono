@@ -30,6 +30,14 @@ pub struct BlockInfo {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreatedAt {
+    pub hash: String,
+    pub sequence: u64,
+    pub network_id: u8,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RpcImportAccountRequest {
     pub version: u8,
     pub name: String,
@@ -37,7 +45,7 @@ pub struct RpcImportAccountRequest {
     pub incoming_view_key: String,
     pub outgoing_view_key: String,
     pub public_address: String,
-    pub created_at: Option<BlockInfo>,
+    pub created_at: Option<CreatedAt>,
     pub spending_key: Option<String>,
 }
 
@@ -103,6 +111,14 @@ pub struct RpcSetAccountHeadRequest {
     pub end: String,
     pub blocks: Vec<BlockWithHash>,
     pub scan_complete: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RpcSetAccountHeadRequestV2 {
+    pub account: String,
+    pub start: String,
+    pub end: String,
+    pub blocks: Vec<BlockWithHash>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

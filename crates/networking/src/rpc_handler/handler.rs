@@ -15,8 +15,8 @@ use crate::{
         RpcGetBlocksResponse, RpcGetLatestBlockResponse, RpcGetTransactionsRequest,
         RpcGetTransactionsResponse, RpcImportAccountRequest, RpcImportAccountResponse,
         RpcRemoveAccountRequest, RpcRemoveAccountResponse, RpcResetAccountRequest, RpcResponse,
-        RpcSetAccountHeadRequest, RpcSetScanningRequest, SendTransactionRequest,
-        SendTransactionResponse, TransactionStatus,
+        RpcSetAccountHeadRequest, RpcSetAccountHeadRequestV2, RpcSetScanningRequest,
+        SendTransactionRequest, SendTransactionResponse, TransactionStatus,
     },
     rpc_handler::RpcError,
     stream::ResponseExt,
@@ -108,6 +108,19 @@ impl RpcHandler {
         &self,
         request: RpcSetAccountHeadRequest,
     ) -> Result<RpcResponse<Option<()>>, OreoError> {
+        let RpcSetAccountHeadRequest {
+            account,
+            start,
+            end,
+            blocks,
+            ..
+        } = request;
+        let request = RpcSetAccountHeadRequestV2 {
+            account,
+            start,
+            end,
+            blocks,
+        };
         let path = format!("http://{}/wallet/setAccountHead", self.endpoint);
         let resp = self.agent.clone().post(&path).send_json(&request);
         handle_response(resp)

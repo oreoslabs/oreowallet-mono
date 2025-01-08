@@ -15,7 +15,7 @@ use axum::{
     routing::post,
     BoxError, Json, Router,
 };
-use db_handler::{DBHandler, InnerBlock, PgHandler};
+use db_handler::{DBHandler, InnerBlock};
 use manager::{AccountInfo, Manager, SecpKey, ServerMessage, SharedState, TaskInfo};
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest, SuccessResponse},
@@ -26,7 +26,7 @@ use params::network::Network;
 use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use utils::{blocks_range, default_secp, verify, Signature};
 
 pub mod manager;
@@ -37,13 +37,14 @@ pub async fn scheduling_tasks(
     accounts: &Vec<ScanRequest>,
     blocks: Vec<InnerBlock>,
 ) -> anyhow::Result<()> {
-    for account in accounts.iter() {
-        if let Some(account_info) = scheduler
+    for account in accounts {
+        let account_info_maybe = scheduler
             .account_mappling
             .read()
             .await
             .get(&account.address)
-        {
+            .cloned();
+        if let Some(account_info) = account_info_maybe {
             debug!(
                 "start scanning {} blocks for account {:?}",
                 blocks.len(),
@@ -106,7 +107,7 @@ pub async fn run_dserver<N: Network>(
     dlisten: SocketAddr,
     restful: SocketAddr,
     rpc_server: String,
-    db_handler: PgHandler,
+    db_handler: Box<dyn Send + Sync + DBHandler>,
     server: String,
     sk_u8: [u8; 32],
     pk_u8: [u8; 33],
@@ -119,36 +120,15 @@ pub async fn run_dserver<N: Network>(
     let manager = Manager::new(shared_resource, N::ID);
 
     if let Err(e) = Manager::initialize_networking(manager.clone(), dlisten).await {
-        error!("init networking server {}", e);
+        error!("Init networking server failed {}", e);
     }
 
-    // manager status updater
-    let status_manager = manager.clone();
-    let (router, handler) = oneshot::channel();
-    tokio::spawn(async move {
-        let _ = router.send(());
-        loop {
-            {
-                info!(
-                    "online workers: {}",
-                    status_manager.workers.read().await.len()
-                );
-                info!(
-                    "pending taskes in queue: {}",
-                    status_manager.task_queue.read().await.len()
-                );
-                info!(
-                    "pending account to scan: {:?}",
-                    status_manager.accounts_to_scan.read().await
-                );
-            }
-            sleep(Duration::from_secs(60)).await;
-        }
-    });
-    let _ = handler.await;
+    if let Err(e) = Manager::initialize_status_updater(manager.clone()).await {
+        error!("Init status updater failed {}", e);
+    }
 
     {
-        info!("warmup, wait for worker to join");
+        info!("Warmup, waiting for workers to join");
         sleep(Duration::from_secs(60)).await;
     }
 
@@ -191,6 +171,8 @@ pub async fn run_dserver<N: Network>(
                         .get(&account.address)
                         .is_some()
                     {
+                        // should never happen
+                        warn!("Unexpected duplicated account to scan {}", account.address);
                         continue;
                     }
                     let head = account.head.clone().unwrap();
@@ -209,7 +191,7 @@ pub async fn run_dserver<N: Network>(
                 if accounts_should_scan.is_empty() {
                     continue;
                 }
-                info!("accounts to scanning, {:?}", accounts_should_scan);
+                info!("accounts to scan, {:?}", accounts_should_scan);
                 let blocks_to_scan =
                     blocks_range(scan_start..scan_end.sequence + 1, N::PRIMARY_BATCH);
                 for group in blocks_to_scan {
@@ -254,6 +236,7 @@ pub async fn run_dserver<N: Network>(
     tokio::spawn(async move {
         let _ = router.send(());
         loop {
+            let mut keys_to_reschedule = vec![];
             for key in secondary
                 .task_mapping
                 .read()
@@ -262,32 +245,70 @@ pub async fn run_dserver<N: Network>(
                 .filter(|(_k, v)| v.since.elapsed().as_secs() >= 600)
                 .map(|(k, _)| k.to_string())
             {
-                info!("rescheduling task: {:?}", key);
-                match secondary.task_mapping.write().await.remove(&key) {
-                    Some(task_info) => {
-                        let address = task_info.address.to_string();
-                        let sequence = task_info.sequence;
-                        if let Some(account) = secondary.account_mappling.read().await.get(&address)
-                        {
-                            if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence) {
-                                let block = block.data.block.to_inner();
-                                let _ = scheduling_tasks(
-                                    secondary.clone(),
-                                    &vec![ScanRequest {
-                                        address: address.clone(),
-                                        in_vk: account.in_vk.clone(),
-                                        out_vk: account.out_vk.clone(),
-                                        head: Some(account.start_block.clone()),
-                                    }],
-                                    vec![block],
-                                )
-                                .await
-                                .unwrap();
+                keys_to_reschedule.push(key);
+            }
+            let keys_count = keys_to_reschedule.len();
+            if keys_count > 0 {
+                info!("Rescheduling {} tasks", keys_count);
+            }
+            let mut tasks_to_resechedule = vec![];
+            for key in keys_to_reschedule {
+                let key_maybe = secondary.task_mapping.write().await.remove(&key).clone();
+                if let Some(task_info) = key_maybe {
+                    let address = task_info.address;
+                    let sequence = task_info.sequence;
+                    let address_maybe = secondary
+                        .account_mappling
+                        .read()
+                        .await
+                        .get(&address)
+                        .cloned();
+                    if let Some(account) = address_maybe {
+                        if let Ok(block) = secondary.shared.rpc_handler.get_block(sequence) {
+                            let block = block.data.block.to_inner();
+                            tasks_to_resechedule.push((
+                                vec![ScanRequest {
+                                    address: address.clone(),
+                                    in_vk: account.in_vk.clone(),
+                                    out_vk: account.out_vk.clone(),
+                                    head: Some(account.start_block.clone()),
+                                }],
+                                vec![block],
+                            ));
+                            if tasks_to_resechedule.len() % 500 == 0 {
+                                info!(
+                                    "Tasks to reschedule len now {:?}",
+                                    tasks_to_resechedule.len()
+                                );
+                            }
+                            // We dont want to reschedule so many tasks at once
+                            if tasks_to_resechedule.len() >= 20000 {
+                                break;
                             }
                         }
+                    } else {
+                        error!("Account info missed for exist task, account {}", address);
                     }
-                    None => {}
                 }
+            }
+            if !tasks_to_resechedule.is_empty() {
+                info!(
+                    "Done prepping tasks to be rescheduled.. now rescheduling {:?}",
+                    tasks_to_resechedule.len()
+                );
+            }
+            let mut count = 0;
+            for (scan_request, blocks) in tasks_to_resechedule {
+                scheduling_tasks(secondary.clone(), &scan_request, blocks)
+                    .await
+                    .unwrap();
+                if count % 1000 == 0 {
+                    info!("Rescheduled tasks so far {:?}", count);
+                }
+                count += 1;
+            }
+            if count > 0 {
+                info!("Done rescheduling {:?} tasks", count);
             }
             sleep(N::RESCHEDULING_DURATION).await;
         }
@@ -344,7 +365,9 @@ pub async fn account_scanner_handler(
         &manager.shared.secp_key.pk,
     ) {
         if x {
-            let _ = manager.accounts_to_scan.write().await.push(message);
+            if !manager.should_skip_request(message.address.clone()).await {
+                let _ = manager.accounts_to_scan.write().await.push(message);
+            }
             return Json(SuccessResponse { success: true });
         }
     }

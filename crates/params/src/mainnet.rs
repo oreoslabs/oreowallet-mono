@@ -4,7 +4,7 @@ use crate::network::Network;
 pub struct Mainnet;
 
 impl Network for Mainnet {
-    const ID: u8 = 0;
+    const ID: u8 = 1;
 
     const NAME: &'static str = "mainnet";
 
@@ -28,5 +28,5 @@ impl Network for Mainnet {
 
     const RESCHEDULING_DURATION: std::time::Duration = std::time::Duration::from_secs(30);
 
-    const LOCAL_BLOCKS_CHECKPOINT: u64 = 86_000;
+    const LOCAL_BLOCKS_CHECKPOINT: u64 = 900_000;
 }
