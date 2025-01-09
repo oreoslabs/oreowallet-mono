@@ -8,7 +8,7 @@ use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::{
     rpc_abi::{
-        RpcAddTxRequest, RpcAddTxResponse, RpcCreateTxRequest, RpcCreateTxResponse,
+        RpcAddTxRequest, RpcAddTxResponse, RpcAsset, RpcCreateTxRequest, RpcCreateTxResponse,
         RpcExportAccountResponse, RpcGetAccountStatusRequest, RpcGetAccountStatusResponse,
         RpcGetAccountTransactionRequest, RpcGetAccountTransactionResponse, RpcGetBalancesRequest,
         RpcGetBalancesResponse, RpcGetBlockRequest, RpcGetBlockResponse, RpcGetBlocksRequest,
@@ -239,6 +239,12 @@ impl RpcHandler {
         let resp = self.agent.clone().post(&path).send_json(request);
         handle_response(resp)
     }
+
+    pub fn get_asset(&self, id: String) -> Result<RpcResponse<RpcAsset>, OreoError> {
+        let path = format!("http://{}/chain/getAsset", self.endpoint);
+        let resp = self.agent.clone().post(&path).send_json(json!({"id": id}));
+        handle_response(resp)
+    }
 }
 
 pub fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
@@ -312,6 +318,18 @@ mod tests {
             reset_created_at: Some(false),
             reset_scanning_enabled: Some(false),
         });
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    pub fn get_asset_should_work() {
+        let rpc_handler = RpcHandler::new("127.0.0.1:8021".into());
+        let header = rpc_handler.get_latest_block();
+        println!("chain header {:?}", header);
+        let result = rpc_handler.get_asset(
+            "8e36e31d677a47cbd883843a345654c814b1e9ec1e0125bac9031f052ced9174".to_string(),
+        );
+        println!("asset info: {:?}", result);
         assert!(result.is_ok());
     }
 }

@@ -151,6 +151,7 @@ pub struct AssetBalance {
     pub available: String,
     pub sequence: Option<u64>,
     pub asset_verification: AssetStatus,
+    pub decimals: Option<u8>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -398,4 +399,21 @@ pub struct SendTransactionRequest {
 pub struct SendTransactionResponse {
     pub account: String,
     pub hash: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcAssetVerification {
+    pub status: String,
+    pub symbol: Option<String>,
+    pub decimals: Option<u8>,
+    pub logo_uri: Option<String>,
+    pub website: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcAsset {
+    pub id: String,
+    pub verification: RpcAssetVerification,
 }
