@@ -7,7 +7,7 @@ use secp256k1::{
 };
 use tokio::sync::oneshot;
 use tracing::{info, warn};
-use tracing_subscriber::EnvFilter;
+pub use tracing_subscriber::EnvFilter;
 
 pub use secp256k1::ecdsa::Signature;
 
@@ -37,11 +37,10 @@ pub fn initialize_logger(verbosity: u8) {
         2 | 3 | 4 => std::env::set_var("RUST_LOG", "trace"),
         _ => std::env::set_var("RUST_LOG", "info"),
     };
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::from_default_env().add_directive("ironfish-server=info".parse().unwrap()),
-        )
-        .init();
+}
+
+pub fn initialize_logger_filter(filter: EnvFilter) {
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 }
 
 pub fn blocks_range(blocks: Range<u64>, batch: u64) -> Vec<Range<u64>> {

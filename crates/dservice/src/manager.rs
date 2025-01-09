@@ -7,8 +7,7 @@ use std::{
 };
 
 use anyhow::Result;
-use constants::{MAINNET_GENESIS_HASH, MAINNET_GENESIS_SEQUENCE};
-use db_handler::{DBHandler, PgHandler};
+use db_handler::DBHandler;
 use futures::{SinkExt, StreamExt};
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest},
@@ -17,6 +16,7 @@ use networking::{
     server_handler::ServerHandler,
     socket_message::codec::{DMessage, DMessageCodec, DRequest, DResponse},
 };
+use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use priority_queue::PriorityQueue;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -26,7 +26,7 @@ use tokio::{
         mpsc::{self, Sender},
         oneshot, RwLock,
     },
-    time::timeout,
+    time::{sleep, timeout},
 };
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::{debug, error, info, warn};
@@ -97,19 +97,23 @@ pub struct SecpKey {
     pub pk: [u8; 33],
 }
 
-#[derive(Debug, Clone)]
-pub struct SharedState<T: DBHandler> {
-    pub db_handler: T,
+pub struct SharedState {
+    pub db_handler: Box<dyn Send + Sync + DBHandler>,
     pub rpc_handler: RpcHandler,
     pub server_handler: ServerHandler,
     pub secp_key: SecpKey,
 }
 
-impl<T> SharedState<T>
-where
-    T: DBHandler,
-{
-    pub fn new(db_handler: T, endpoint: &str, server: &str, secp_key: SecpKey) -> Self {
+unsafe impl Send for SharedState {}
+unsafe impl Sync for SharedState {}
+
+impl SharedState {
+    pub fn new(
+        db_handler: Box<dyn Send + Sync + DBHandler>,
+        endpoint: &str,
+        server: &str,
+        secp_key: SecpKey,
+    ) -> Self {
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
@@ -119,18 +123,18 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct Manager {
     pub workers: Arc<RwLock<HashMap<String, ServerWorker>>>,
     pub task_queue: Arc<RwLock<PriorityQueue<DRequest, Reverse<i64>>>>,
     pub task_mapping: Arc<RwLock<HashMap<String, TaskInfo>>>,
     pub account_mappling: Arc<RwLock<HashMap<String, AccountInfo>>>,
-    pub shared: Arc<SharedState<PgHandler>>,
+    pub shared: Arc<SharedState>,
     pub accounts_to_scan: Arc<RwLock<Vec<ScanRequest>>>,
+    pub network: u8,
 }
 
 impl Manager {
-    pub fn new(shared: Arc<SharedState<PgHandler>>) -> Arc<Self> {
+    pub fn new(shared: Arc<SharedState>, network: u8) -> Arc<Self> {
         Arc::new(Self {
             workers: Arc::new(RwLock::new(HashMap::new())),
             task_queue: Arc::new(RwLock::new(PriorityQueue::new())),
@@ -138,7 +142,72 @@ impl Manager {
             account_mappling: Arc::new(RwLock::new(HashMap::new())),
             shared,
             accounts_to_scan: Arc::new(RwLock::new(vec![])),
+            network: network,
         })
+    }
+
+    pub fn genesis_block(&self) -> BlockInfo {
+        match self.network {
+            Mainnet::ID => BlockInfo {
+                hash: Mainnet::GENESIS_BLOCK_HASH.to_string(),
+                sequence: Mainnet::GENESIS_BLOCK_HEIGHT,
+            },
+            Testnet::ID => BlockInfo {
+                hash: Testnet::GENESIS_BLOCK_HASH.to_string(),
+                sequence: Testnet::GENESIS_BLOCK_HEIGHT,
+            },
+            _ => BlockInfo {
+                hash: Mainnet::GENESIS_BLOCK_HASH.to_string(),
+                sequence: Mainnet::GENESIS_BLOCK_HEIGHT,
+            },
+        }
+    }
+
+    pub async fn should_skip_request(&self, address: String) -> bool {
+        if self
+            .accounts_to_scan
+            .read()
+            .await
+            .iter()
+            .find(|account| account.address == address.clone())
+            .is_some()
+            || self.account_mappling.read().await.get(&address).is_some()
+        {
+            return true;
+        }
+        false
+    }
+
+    pub async fn initialize_status_updater(server: Arc<Self>) -> Result<()> {
+        let (router, handler) = oneshot::channel();
+        tokio::spawn(async move {
+            let _ = router.send(());
+            loop {
+                {
+                    info!("online workers: {}", server.workers.read().await.len());
+                    info!(
+                        "pending taskes in queue: {}",
+                        server.task_queue.read().await.len()
+                    );
+                    info!(
+                        "scanning tasks: {:?}",
+                        server.task_mapping.read().await.len()
+                    );
+                    info!(
+                        "pending account to scan: {:?}",
+                        server.accounts_to_scan.read().await
+                    );
+                    info!(
+                        "scanning accounts: {:?}",
+                        server.account_mappling.read().await
+                    );
+                }
+                sleep(Duration::from_secs(60)).await;
+            }
+        });
+        let _ = handler.await;
+        info!("Status updater installed!");
+        Ok(())
     }
 
     pub async fn initialize_networking(server: Arc<Self>, addr: SocketAddr) -> Result<()> {
@@ -203,7 +272,7 @@ impl Manager {
                 tokio::select! {
                     _ = timer.tick() => {
                         debug!("no message from worker {} for 5 mins, exit", worker_name);
-                        let _ = worker_server.workers.write().await.remove(&worker_name).unwrap();
+                        let _ = worker_server.workers.write().await.remove(&worker_name);
                         break;
                     },
                     result = outbound_r.next() => {
@@ -219,7 +288,7 @@ impl Manager {
                                             false => {
                                                 let worker = ServerWorker::new(tx.clone());
                                                 worker_name = register.name;
-                                                debug!("new worker: {}", worker_name.clone());
+                                                info!("new worker: {}", worker_name.clone());
                                                 let _ = worker_server.workers.write().await.insert(worker_name.clone(), worker);
                                                 let data = worker_server.task_queue.write().await.pop();
                                                 match data {
@@ -233,7 +302,7 @@ impl Manager {
                                     },
                                     DMessage::DRequest(_) => {
                                         error!("invalid message from worker, should never happen");
-                                        let _ = worker_server.workers.write().await.remove(&worker_name).unwrap();
+                                        let _ = worker_server.workers.write().await.remove(&worker_name);
                                         break;
                                     },
                                     DMessage::DResponse(response) => {
@@ -251,7 +320,7 @@ impl Manager {
                             },
                             _ => {
                                 warn!("unknown message");
-                                let _ = worker_server.workers.write().await.remove(&worker_name).unwrap();
+                                let _ = worker_server.workers.write().await.remove(&worker_name);
                                 break;
                             },
                         }
@@ -268,19 +337,16 @@ impl Manager {
         let address = response.address.clone();
         let task_id = response.id.clone();
         let mut update_account = false;
-        let mut latest_scanned_block = BlockInfo {
-            hash: MAINNET_GENESIS_HASH.to_string(),
-            sequence: MAINNET_GENESIS_SEQUENCE as u64,
-        };
         match self.account_mappling.write().await.get_mut(&address) {
             Some(account) => {
-                if let Some(task_info) = self.task_mapping.read().await.get(&task_id) {
-                    let block_hash = task_info.hash.to_string();
+                let maybe_task = self.task_mapping.read().await.get(&task_id).cloned();
+                if let Some(task_info) = maybe_task {
+                    let block_hash = task_info.hash.clone();
                     if !response.data.is_empty() {
-                        info!("account info: {:?}", account);
+                        debug!("account info: {:?}", account);
                         info!("new available block {} for account {}", block_hash, address);
                         account.blocks.insert(
-                            block_hash,
+                            block_hash.clone(),
                             response
                                 .data
                                 .into_iter()
@@ -289,14 +355,8 @@ impl Manager {
                         );
                     }
                     account.remaining_task -= 1;
-                    if account.remaining_task % 5000 == 0 {
+                    if account.remaining_task == 0 {
                         update_account = true;
-                    }
-                    if task_info.sequence > latest_scanned_block.sequence as i64 {
-                        latest_scanned_block = BlockInfo {
-                            hash: task_info.hash.clone(),
-                            sequence: task_info.sequence as u64,
-                        };
                     }
                 }
             }
@@ -314,9 +374,9 @@ impl Manager {
                 .clone();
             let set_account_head_request = RpcSetAccountHeadRequest {
                 account: address.clone(),
-                start: account_info.start_block.hash.to_string(),
-                end: latest_scanned_block.hash.clone(),
-                scan_complete: account_info.remaining_task == 0,
+                start: account_info.start_block.hash,
+                end: account_info.end_block.hash,
+                scan_complete: true,
                 blocks: account_info
                     .blocks
                     .iter()
@@ -335,14 +395,24 @@ impl Manager {
                 message: set_account_head_request,
                 signature,
             };
-            match self.shared.server_handler.submit_scan_response(request) {
-                Ok(msg) => {
-                    if msg.success && account_info.end_block.hash == latest_scanned_block.hash {
-                        let _ = self.account_mappling.write().await.remove(&address);
-                    }
+            let mut retry = 0;
+            loop {
+                if retry == 3 {
+                    break;
                 }
-                Err(e) => error!("failed to submit decryption response to server, {:?}", e),
+                if let Err(e) = self
+                    .shared
+                    .server_handler
+                    .submit_scan_response(request.clone())
+                {
+                    error!("Submit scan result failed {}", e);
+                } else {
+                    break;
+                }
+                retry += 1;
             }
+            info!("Scanning for account {} completed", address);
+            let _ = self.account_mappling.write().await.remove(&address);
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
         Ok(())

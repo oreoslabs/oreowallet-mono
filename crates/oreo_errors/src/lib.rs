@@ -21,6 +21,10 @@ pub enum OreoError {
     DBError,
     #[error("Internal Ironfish rpc error")]
     InternalRpcError(String),
+    #[error("Too many proofs to handle")]
+    TooManyProofs,
+    #[error("Generate `{0}` proof failed")]
+    GenerateProofError(String),
     #[error("The `{0}` spend circuit can not generate proof")]
     GenerateSpendProofFailed(u32),
     #[error("The `{0}` output circuit can not generate proof")]
@@ -53,7 +57,9 @@ impl IntoResponse for OreoError {
             OreoError::NoImported(_) => (StatusCode::from_u16(602).unwrap(), self.to_string()),
             OreoError::Scanning(_) => (StatusCode::from_u16(603).unwrap(), self.to_string()),
             OreoError::Syncing => (StatusCode::from_u16(604).unwrap(), self.to_string()),
-            OreoError::InternalRpcError(_) => (StatusCode::from_u16(605).unwrap(), self.to_string()),
+            OreoError::InternalRpcError(_) => {
+                (StatusCode::from_u16(605).unwrap(), self.to_string())
+            }
             OreoError::GenerateSpendProofFailed(_) => {
                 (StatusCode::from_u16(606).unwrap(), self.to_string())
             }
@@ -73,6 +79,10 @@ impl IntoResponse for OreoError {
             OreoError::DServerError => (StatusCode::from_u16(614).unwrap(), self.to_string()),
             OreoError::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
             OreoError::RpcStreamError(_) => (StatusCode::from_u16(615).unwrap(), self.to_string()),
+            OreoError::TooManyProofs => (StatusCode::from_u16(616).unwrap(), self.to_string()),
+            OreoError::GenerateProofError(_) => {
+                (StatusCode::from_u16(617).unwrap(), self.to_string())
+            }
         };
         Json(json!({"code": status_code.as_u16(), "error": err_msg})).into_response()
     }
