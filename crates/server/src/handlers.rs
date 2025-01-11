@@ -19,7 +19,6 @@ use networking::{
 use oreo_errors::OreoError;
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use serde_json::json;
-use tracing::error;
 use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;
@@ -69,7 +68,7 @@ pub async fn import_account_handler(
                 .index
                 .parse::<u64>()
                 .unwrap();
-            shared
+            let result = shared
                 .rpc_handler
                 .get_account_status(RpcGetAccountStatusRequest {
                     account: account_name.clone(),
@@ -80,15 +79,15 @@ pub async fn import_account_handler(
                         sequence: genesis.sequence,
                     });
                     if latest_height - head.sequence > 1000 {
-                        let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
+                        shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                             account: account_name.clone(),
                             enabled: false,
-                        });
-                        let _ = shared.rpc_handler.reset_account(RpcResetAccountRequest {
+                        })?;
+                        shared.rpc_handler.reset_account(RpcResetAccountRequest {
                             account: account_name.clone(),
                             reset_scanning_enabled: Some(false),
                             reset_created_at: Some(false),
-                        });
+                        })?;
                         let scan_request = ScanRequest {
                             address: public_address.clone(),
                             in_vk: incoming_view_key.clone(),
@@ -99,19 +98,24 @@ pub async fn import_account_handler(
                         let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
                             .unwrap()
                             .to_string();
-                        let _ = shared.scan_handler.submit_scan_request(DecryptionMessage {
+                        shared.scan_handler.submit_scan_request(DecryptionMessage {
                             message: scan_request,
                             signature,
-                        });
+                        })?;
                     }
-                    RpcResponse {
-                        status: 200,
-                        data: RpcImportAccountResponse {
-                            name: account_name.clone(),
-                        },
-                    }
-                })
-                .into_response()
+                    Ok::<RpcImportAccountResponse, OreoError>(RpcImportAccountResponse {
+                        name: account_name.clone(),
+                    })
+                });
+            match result {
+                Ok(response) => RpcResponse {
+                    status: 200,
+                    data: response,
+                }
+                .into_response(),
+
+                Err(e) => e.into_response(),
+            }
         }
         Err(e) => e.into_response(),
     }
@@ -180,65 +184,72 @@ pub async fn account_status_handler(
     .into_response()
 }
 
+async fn rescan_account(
+    shared: Arc<SharedState>,
+    account: RpcGetAccountStatusRequest,
+) -> Result<RescanAccountResponse, OreoError> {
+    let account = shared
+        .db_handler
+        .get_account(account.account.clone())
+        .await?;
+    shared.rpc_handler.set_scanning(RpcSetScanningRequest {
+        account: account.name.clone(),
+        enabled: false,
+    })?;
+    shared.rpc_handler.reset_account(RpcResetAccountRequest {
+        account: account.name.clone(),
+        reset_scanning_enabled: Some(false),
+        reset_created_at: Some(false),
+    })?;
+    let _ = shared
+        .db_handler
+        .update_scan_status(account.address.clone(), true)
+        .await?;
+    let status = shared
+        .rpc_handler
+        .get_account_status(RpcGetAccountStatusRequest {
+            account: account.name.clone(),
+        })?;
+    let genesis = shared.genesis();
+    let head = status.data.account.head.unwrap_or(BlockInfo {
+        hash: genesis.hash.clone(),
+        sequence: genesis.sequence,
+    });
+    let scan_request = ScanRequest {
+        address: account.address.clone(),
+        in_vk: account.in_vk.clone(),
+        out_vk: account.out_vk.clone(),
+        head: Some(head),
+    };
+    let msg = bincode::serialize(&scan_request).unwrap();
+    let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
+        .unwrap()
+        .to_string();
+    shared.scan_handler.submit_scan_request(DecryptionMessage {
+        message: scan_request,
+        signature,
+    })?;
+    Ok(RescanAccountResponse { success: true })
+}
+
 pub async fn rescan_account_handler(
     State(shared): State<Arc<SharedState>>,
     extract::Json(account): extract::Json<RpcGetAccountStatusRequest>,
 ) -> impl IntoResponse {
-    let db_account = shared.db_handler.get_account(account.account.clone()).await;
-    if let Err(e) = db_account {
-        return e.into_response();
+    match rescan_account(shared, account).await {
+        Ok(response) => RpcResponse {
+            status: 200,
+            data: response,
+        }
+        .into_response(),
+        Err(err) => err.into_response(),
     }
-    let account = db_account.unwrap();
-    let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
-        account: account.name.clone(),
-        enabled: false,
-    });
-    let _ = shared.rpc_handler.reset_account(RpcResetAccountRequest {
-        account: account.name.clone(),
-        reset_scanning_enabled: Some(false),
-        reset_created_at: Some(false),
-    });
-    let _ = shared
-        .db_handler
-        .update_scan_status(account.address.clone(), true)
-        .await;
-    if let Ok(x) = shared
-        .rpc_handler
-        .get_account_status(RpcGetAccountStatusRequest {
-            account: account.name.clone(),
-        })
-    {
-        let genesis = shared.genesis().clone();
-        let head = x.data.account.head.unwrap_or(BlockInfo {
-            hash: genesis.hash.clone(),
-            sequence: genesis.sequence,
-        });
-        let scan_request = ScanRequest {
-            address: account.address.clone(),
-            in_vk: account.in_vk.clone(),
-            out_vk: account.out_vk.clone(),
-            head: Some(head),
-        };
-        let msg = bincode::serialize(&scan_request).unwrap();
-        let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
-            .unwrap()
-            .to_string();
-        let _ = shared.scan_handler.submit_scan_request(DecryptionMessage {
-            message: scan_request,
-            signature,
-        });
-    }
-    RpcResponse {
-        status: 200,
-        data: RescanAccountResponse { success: true },
-    }
-    .into_response()
 }
 
-pub async fn update_scan_status_handler(
-    State(shared): State<Arc<SharedState>>,
-    extract::Json(response): extract::Json<DecryptionMessage<ScanResponse>>,
-) -> impl IntoResponse {
+async fn update_scan_status(
+    shared: Arc<SharedState>,
+    response: DecryptionMessage<ScanResponse>,
+) -> Result<SuccessResponse, OreoError> {
     let DecryptionMessage {
         mut message,
         signature,
@@ -246,38 +257,45 @@ pub async fn update_scan_status_handler(
     let secp = default_secp();
     let msg = bincode::serialize(&message).unwrap();
     let signature = Signature::from_str(&signature).unwrap();
-    if let Ok(x) = verify(
+    if let Ok(true) = verify(
         &secp,
         &msg[..],
         signature.serialize_compact(),
         &shared.secp.pk,
     ) {
-        if x {
-            let db_account = shared.db_handler.get_account(message.account.clone()).await;
-            if let Err(e) = db_account {
-                return e.into_response();
-            }
-            let account = db_account.unwrap();
-            message.account = account.name.clone();
-            let resp = shared.rpc_handler.set_account_head(message.clone());
-
-            if resp.is_err() {
-                error!("Failed to update account head: {:?}", resp.unwrap_err());
-            }
-            if message.scan_complete {
-                let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
-                    account: account.name.clone(),
-                    enabled: true,
-                });
-                let _ = shared
-                    .db_handler
-                    .update_scan_status(account.address, false)
-                    .await;
-            }
-            return Json(SuccessResponse { success: true }).into_response();
+        let account = shared
+            .db_handler
+            .get_account(message.account.clone())
+            .await?;
+        message.account = account.name.clone();
+        shared.rpc_handler.set_account_head(message.clone())?;
+        if message.scan_complete {
+            let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
+                account: account.name.clone(),
+                enabled: true,
+            })?;
+            shared
+                .db_handler
+                .update_scan_status(account.address, false)
+                .await?;
         }
+        return Ok(SuccessResponse { success: true });
     }
-    Json(SuccessResponse { success: false }).into_response()
+    Ok(SuccessResponse { success: true })
+}
+
+pub async fn update_scan_status_handler(
+    State(shared): State<Arc<SharedState>>,
+    extract::Json(response): extract::Json<DecryptionMessage<ScanResponse>>,
+) -> impl IntoResponse {
+    match update_scan_status(shared, response).await {
+        Ok(response) => RpcResponse {
+            status: 200,
+            data: response,
+        }
+        .into_response(),
+        Err(err) => err.into_response(),
+    }
 }
 
 pub async fn get_balances_handler(
