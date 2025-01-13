@@ -25,6 +25,4 @@ networking = { path = "../networking" }
 utils = { path = "../utils" }
 hex = "0.4.3"
 priority-queue = "2.0.2"
-dotenv = "0.15.0"
-bincode = "1.3.3"
 params = { path = "../params" }

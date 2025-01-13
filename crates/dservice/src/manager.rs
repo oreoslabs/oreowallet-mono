@@ -2,6 +2,7 @@ use std::{
     cmp::Reverse,
     collections::HashMap,
     net::SocketAddr,
+    str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -30,7 +31,7 @@ use tokio::{
 };
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::{debug, error, info, warn};
-use utils::{default_secp, sign};
+use utils::Signer;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -91,17 +92,11 @@ impl AccountInfo {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct SecpKey {
-    pub sk: [u8; 32],
-    pub pk: [u8; 33],
-}
-
 pub struct SharedState {
     pub db_handler: Box<dyn Send + Sync + DBHandler>,
     pub rpc_handler: RpcHandler,
     pub server_handler: ServerHandler,
-    pub secp_key: SecpKey,
+    pub operator: Signer,
 }
 
 unsafe impl Send for SharedState {}
@@ -112,13 +107,14 @@ impl SharedState {
         db_handler: Box<dyn Send + Sync + DBHandler>,
         endpoint: &str,
         server: &str,
-        secp_key: SecpKey,
+        operator: String,
     ) -> Self {
+        let operator = Signer::from_str(&operator).expect("Invalid secret key used");
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
             server_handler: ServerHandler::new(server.into()),
-            secp_key,
+            operator,
         }
     }
 }
@@ -386,11 +382,11 @@ impl Manager {
                     })
                     .collect(),
             };
-            let msg = bincode::serialize(&set_account_head_request).unwrap();
-            let secp = default_secp();
-            let signature = sign(&secp, &msg[..], &self.shared.secp_key.sk)
-                .unwrap()
-                .to_string();
+            let signature = self
+                .shared
+                .operator
+                .sign(&set_account_head_request)
+                .unwrap_or("default_signature, should never happen".into());
             let request = DecryptionMessage {
                 message: set_account_head_request,
                 signature,

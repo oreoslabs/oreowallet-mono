@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     extract::{self, State},
@@ -19,7 +19,6 @@ use networking::{
 use oreo_errors::OreoError;
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use serde_json::json;
-use utils::{default_secp, sign, verify, Signature};
 
 use crate::SharedState;
 
@@ -94,10 +93,10 @@ pub async fn import_account_handler(
                             out_vk: outgoing_view_key.clone(),
                             head: Some(head),
                         };
-                        let msg = bincode::serialize(&scan_request).unwrap();
-                        let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
-                            .unwrap()
-                            .to_string();
+                        let signature = shared
+                            .operator
+                            .sign(&scan_request)
+                            .unwrap_or("default_but_bad_signature, should never happen".into());
                         shared.scan_handler.submit_scan_request(DecryptionMessage {
                             message: scan_request,
                             signature,
@@ -221,10 +220,10 @@ async fn rescan_account(
         out_vk: account.out_vk.clone(),
         head: Some(head),
     };
-    let msg = bincode::serialize(&scan_request).unwrap();
-    let signature = sign(&default_secp(), &msg[..], &shared.secp.sk)
-        .unwrap()
-        .to_string();
+    let signature = shared
+        .operator
+        .sign(&scan_request)
+        .unwrap_or("default_but_bad_signature, should never happen".into());
     shared.scan_handler.submit_scan_request(DecryptionMessage {
         message: scan_request,
         signature,
@@ -254,15 +253,7 @@ async fn update_scan_status(
         mut message,
         signature,
     } = response;
-    let secp = default_secp();
-    let msg = bincode::serialize(&message).unwrap();
-    let signature = Signature::from_str(&signature).unwrap();
-    if let Ok(true) = verify(
-        &secp,
-        &msg[..],
-        signature.serialize_compact(),
-        &shared.secp.pk,
-    ) {
+    if let Ok(true) = shared.operator.verify(&message, signature) {
         let account = shared
             .db_handler
             .get_account(message.account.clone())
