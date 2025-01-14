@@ -1,13 +1,14 @@
 use std::{cmp, ops::Range, time::Duration};
 
+mod cli;
 mod signer;
+pub use clap::Parser;
+pub use cli::*;
 pub use signer::*;
 
 use tokio::sync::oneshot;
 use tracing::{info, warn};
 pub use tracing_subscriber::EnvFilter;
-
-pub use secp256k1::ecdsa::Signature;
 
 pub async fn handle_signals() -> anyhow::Result<()> {
     let (router, handler) = oneshot::channel();

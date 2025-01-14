@@ -93,9 +93,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.7"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "038dfcf04a5feb68e9c60b21c9625a54c2c0616e79b72b0fd87075a056ae1d1b"
+checksum = "55cc3b69f167a1ef2e161439aa98aed94e6028e5f9a59be9a6ffb47aef1651f9"
 
 [[package]]
 name = "anstyle-parse"
@@ -593,7 +593,6 @@ name = "chain_loader"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "clap",
  "db_handler",
  "networking",
  "oreo_errors",
@@ -626,9 +625,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.4"
+version = "4.5.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90bc066a67923782aa8515dbaea16946c5bcc5addbd668bb80af688e53e548a0"
+checksum = "a8eb5e908ef3a6efbe1ed62520fb7287959888c88485abe072543190ecc66783"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -636,9 +635,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.2"
+version = "4.5.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae129e2e766ae0ec03484e609954119f123cc1fe650337e155d03b022f24f7b4"
+checksum = "96b01801b5fc6a0a232407abc821660c9c6d25a1cafc0d4f85f29fb8d9afc121"
 dependencies = [
  "anstream",
  "anstyle",
@@ -648,9 +647,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.4"
+version = "4.5.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "528131438037fd55894f62d6e9f068b8f45ac57ffa77517819645d10aed04f64"
+checksum = "54b755194d6389280185988721fffba69495eed5ee9feeee9a599b53db80318c"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -660,9 +659,9 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
-version = "0.7.0"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
+checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "colorchoice"
@@ -949,7 +948,6 @@ dependencies = [
  "anyhow",
  "axum",
  "bytes",
- "clap",
  "db_handler",
  "futures",
  "hex",
@@ -974,7 +972,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
- "clap",
  "db_handler",
  "futures",
  "gethostname",
@@ -2380,7 +2377,6 @@ dependencies = [
  "bellperson",
  "blst",
  "blstrs",
- "clap",
  "db_handler",
  "getrandom 0.2.14",
  "ironfish",
@@ -2894,7 +2890,6 @@ dependencies = [
  "anyhow",
  "axum",
  "axum-extra",
- "clap",
  "db_handler",
  "hex",
  "networking",
@@ -3729,6 +3724,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bincode",
+ "clap",
  "secp256k1",
  "serde",
  "tokio",
