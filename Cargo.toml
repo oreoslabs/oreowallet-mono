@@ -8,7 +8,7 @@ members = [
     "crates/utils",
     "crates/prover",
     "crates/dworker",
-    "crates/dservice",
+    "crates/scanner",
     "crates/chain_loader", 
     "crates/params",
 ]
