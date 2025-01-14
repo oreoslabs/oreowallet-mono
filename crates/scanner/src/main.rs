@@ -1,7 +1,7 @@
 use anyhow::Result;
 use db_handler::load_db;
-use dservice::run_dserver;
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
+use scanner::run_dserver;
 use utils::{
     handle_signals, initialize_logger, initialize_logger_filter, EnvFilter, Parser, Scanner,
 };
