@@ -169,7 +169,13 @@ pub async fn run_dserver<N: Network>(
                         warn!("Unexpected duplicated account to scan {}", account.address);
                         continue;
                     }
-                    let head = account.head.clone().unwrap();
+                    let head = {
+                        let head = account.head.clone().unwrap();
+                        match head.sequence >= scan_end.sequence {
+                            true => scan_end.clone(),
+                            false => head,
+                        }
+                    };
                     let _ = schduler.account_mappling.write().await.insert(
                         account.address.clone(),
                         AccountInfo::new(
