@@ -7,7 +7,7 @@ pub struct Server {
     /// The ip:port server will listen for incoming restful requests.
     #[clap(long, default_value = "0.0.0.0:10001")]
     pub listen: SocketAddr,
-    /// Specify the path to the db config file
+    /// Specify the path to the db config file.
     #[clap(long)]
     pub dbconfig: String,
     /// The Ironfish rpc node to connect to.
@@ -16,7 +16,7 @@ pub struct Server {
     /// The scanner service to connect to.
     #[clap(long, default_value = "127.0.0.1:9093")]
     pub scanner: String,
-    /// The network to work on, 0 for mainnet, 1 for testnet.
+    /// The network to work on, 0 for testnet, 1 for mainnet.
     #[clap(long, default_value = "0")]
     pub network: u8,
     /// The operator secret key for signing messages.
@@ -54,7 +54,7 @@ pub struct Scanner {
     /// The oreowallet server to contribute to.
     #[clap(short, long, default_value = "127.0.0.1:9093")]
     pub server: String,
-    /// The network to work on, 0 for mainnet, 1 for testnet.
+    /// The network to work on, 0 for testnet, 1 for mainnet.
     #[clap(long, default_value = "0")]
     pub network: u8,
     /// The operator secret key for signing messages.
