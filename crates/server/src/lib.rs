@@ -5,7 +5,7 @@ use axum_extra::{
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use sha2::{Digest, Sha256};
 use std::str::{self, FromStr};
-use std::{env, net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use utils::Signer;
 
 use anyhow::Result;
@@ -167,9 +167,7 @@ pub async fn run_server<N: Network>(
         .route("/rescan", post(rescan_account_handler))
         .with_state(shared_resource.clone());
 
-    if env::var("ENABLE_AUTH").unwrap_or_else(|_| "false".to_string()) == "true" {
-        auth_router = auth_router.layer(auth_middleware);
-    }
+    auth_router = auth_router.layer(auth_middleware);
 
     let router = no_auth_router
         .merge(auth_router)
