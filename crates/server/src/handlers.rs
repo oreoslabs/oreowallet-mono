@@ -8,19 +8,23 @@ use axum::{
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest, ScanResponse, SuccessResponse},
     rpc_abi::{
-        BlockInfo, CreatedAt, OutPut, RpcAddTxRequest, RpcCreateTxRequest,
+        BlockInfo, BlockWithHash, CreatedAt, OutPut, RpcAddTxRequest, RpcCreateTxRequest,
         RpcGetAccountStatusRequest, RpcGetAccountTransactionRequest, RpcGetBalancesRequest,
         RpcGetBalancesResponse, RpcGetTransactionsRequest, RpcImportAccountRequest,
         RpcImportAccountResponse, RpcRemoveAccountRequest, RpcResetAccountRequest, RpcResponse,
-        RpcSetScanningRequest,
+        RpcSetAccountHeadRequest, RpcSetScanningRequest,
     },
     web_abi::{GetTransactionDetailResponse, ImportAccountRequest, RescanAccountResponse},
 };
 use oreo_errors::OreoError;
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use serde_json::json;
+use sha2::digest::crypto_common::rand_core::block;
 use tracing::error;
 use utils::{default_secp, sign, verify, Signature};
+
+// Adjust this number if setAccountHead is timing out
+const SET_ACCOUNT_HEAD_TXN_LIMIT: usize = 20;
 
 use crate::SharedState;
 
@@ -259,11 +263,60 @@ pub async fn update_scan_status_handler(
             }
             let account = db_account.unwrap();
             message.account = account.name.clone();
-            let resp = shared.rpc_handler.set_account_head(message.clone());
 
-            if resp.is_err() {
-                error!("Failed to update account head: {:?}", resp.unwrap_err());
+            // Split blocks into chunks based on transaction count
+            let mut chunked_messages = vec![];
+
+            let mut current_chunk_blocks = vec![];
+            let mut current_chunk_txn_count = 0;
+            let mut current_chunk_start = message.start.clone();
+
+            for block in &message.blocks {
+                let block_txns = block.transactions.len();
+
+                // Start new chunk if current would exceed SET_ACCOUNT_HEAD_TXN_LIMIT txns
+                if current_chunk_txn_count + block_txns > SET_ACCOUNT_HEAD_TXN_LIMIT
+                    && !current_chunk_blocks.is_empty()
+                {
+                    let last_block: &BlockWithHash = current_chunk_blocks.last().unwrap();
+
+                    chunked_messages.push(RpcSetAccountHeadRequest {
+                        account: message.account.clone(),
+                        blocks: current_chunk_blocks.clone(),
+                        start: current_chunk_start.clone(),
+                        end: last_block.hash.clone(),
+                        scan_complete: false,
+                    });
+
+                    current_chunk_start = last_block.hash.clone();
+                    // Repeat the last block, since setaccounthead's start is inclusive.
+                    // This potentially doubles the SET_ACCOUNT_HEAD_TXN_LIMIT per message.
+                    current_chunk_blocks = vec![last_block.clone()];
+                    current_chunk_txn_count = 0;
+                }
+
+                // Add block to current chunk
+                current_chunk_blocks.push(block.clone());
+                current_chunk_txn_count += block_txns;
             }
+
+            // There should always be at least one message, even if no blocks
+            chunked_messages.push(RpcSetAccountHeadRequest {
+                account: message.account.clone(),
+                blocks: current_chunk_blocks,
+                start: current_chunk_start.clone(),
+                end: message.end.clone(),
+                scan_complete: message.scan_complete,
+            });
+
+            // Process each chunk of blocks
+            for chunked_message in chunked_messages {
+                let resp = shared.rpc_handler.set_account_head(chunked_message);
+                if resp.is_err() {
+                    error!("Failed to update account head: {:?}", resp.unwrap_err());
+                }
+            }
+
             if message.scan_complete {
                 let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                     account: account.name.clone(),
