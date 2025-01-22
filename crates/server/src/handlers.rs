@@ -258,9 +258,47 @@ async fn update_scan_status(
             .db_handler
             .get_account(message.account.clone())
             .await?;
+        let batch_size = shared.set_account_limit();
+        let scan_complete = message.scan_complete;
+        let mut first_request = true;
         message.account = account.name.clone();
-        shared.rpc_handler.set_account_head(message.clone())?;
-        if message.scan_complete {
+        let mut blocks = message.blocks;
+        blocks.sort_by(|a, b| b.sequence.cmp(&a.sequence));
+        loop {
+            let mut limited_blocks = Vec::with_capacity(batch_size);
+            let mut start_hash = String::new();
+            let mut start_sequence = i64::MAX;
+            let mut end_hash = String::new();
+            let mut end_sequence = -1;
+            while let Some(block) = blocks.pop() {
+                if block.sequence <= start_sequence {
+                    start_sequence = block.sequence;
+                    start_hash = block.hash.clone();
+                }
+
+                if block.sequence >= end_sequence {
+                    end_sequence = block.sequence;
+                    end_hash = block.hash.clone();
+                }
+                limited_blocks.push(block);
+                if limited_blocks.len() >= batch_size {
+                    break;
+                }
+            }
+            if limited_blocks.is_empty() {
+                break;
+            }
+            message.blocks = limited_blocks;
+            if !first_request {
+                message.start = start_hash;
+            }
+            if !blocks.is_empty() {
+                message.end = end_hash;
+            }
+            shared.rpc_handler.set_account_head(message.clone())?;
+            first_request = false;
+        }
+        if scan_complete {
             let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                 account: account.name.clone(),
                 enabled: true,

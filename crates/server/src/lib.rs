@@ -84,6 +84,13 @@ impl SharedState {
             _ => Mainnet::ACCOUNT_VERSION,
         }
     }
+
+    pub fn set_account_limit(&self) -> usize {
+        match self.network() {
+            Testnet::ID => Testnet::SET_ACCOUNT_LIMIT,
+            _ => Mainnet::SET_ACCOUNT_LIMIT,
+        }
+    }
 }
 
 unsafe impl Send for SharedState {}

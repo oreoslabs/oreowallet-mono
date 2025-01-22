@@ -70,7 +70,7 @@ pub struct AccountInfo {
     pub in_vk: String,
     pub out_vk: String,
     // mapping from block_hash to transaction list in this block
-    pub blocks: HashMap<String, Vec<TransactionWithHash>>,
+    pub blocks: HashMap<String, (i64, Vec<TransactionWithHash>)>,
 }
 
 impl AccountInfo {
@@ -343,11 +343,14 @@ impl Manager {
                         info!("new available block {} for account {}", block_hash, address);
                         account.blocks.insert(
                             block_hash.clone(),
-                            response
-                                .data
-                                .into_iter()
-                                .map(|hash| TransactionWithHash { hash })
-                                .collect(),
+                            (
+                                task_info.sequence,
+                                response
+                                    .data
+                                    .into_iter()
+                                    .map(|hash| TransactionWithHash { hash })
+                                    .collect(),
+                            ),
                         );
                     }
                     account.remaining_task -= 1;
@@ -376,8 +379,9 @@ impl Manager {
                 blocks: account_info
                     .blocks
                     .iter()
-                    .map(|(k, v)| BlockWithHash {
+                    .map(|(k, (sequence, v))| BlockWithHash {
                         hash: k.to_string(),
+                        sequence: *sequence,
                         transactions: v.clone(),
                     })
                     .collect(),
