@@ -25,4 +25,6 @@ pub trait Network: 'static + Send + Sync + Debug + Eq + PartialEq + Copy + Clone
     const RESCHEDULING_DURATION: Duration;
     /// The local block checkpoint for scanning.
     const LOCAL_BLOCKS_CHECKPOINT: u64;
+    /// The set account head request limit.
+    const SET_ACCOUNT_LIMIT: usize;
 }

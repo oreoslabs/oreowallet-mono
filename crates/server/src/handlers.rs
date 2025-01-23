@@ -258,9 +258,44 @@ async fn update_scan_status(
             .db_handler
             .get_account(message.account.clone())
             .await?;
+        let batch_size = shared.set_account_limit();
+        let scan_complete = message.scan_complete;
+        let mut first_request = true;
         message.account = account.name.clone();
-        shared.rpc_handler.set_account_head(message.clone())?;
-        if message.scan_complete {
+        let mut blocks = message.blocks.clone();
+        blocks.sort_by(|a, b| b.sequence.cmp(&a.sequence));
+        let mut start_hash = String::new();
+        let mut end_hash;
+        loop {
+            let mut message = message.clone();
+            let mut limited_blocks = Vec::with_capacity(batch_size);
+            while let Some(block) = blocks.pop() {
+                limited_blocks.push(block);
+                if limited_blocks.len() >= batch_size {
+                    break;
+                }
+            }
+            if !first_request && limited_blocks.is_empty() {
+                break;
+            }
+            if !first_request {
+                message.start = start_hash;
+            }
+            if !limited_blocks.is_empty() && !blocks.is_empty() {
+                end_hash = limited_blocks.last().unwrap().hash.clone();
+            } else {
+                end_hash = message.end.clone();
+            }
+
+            message.end = end_hash.clone();
+            message.blocks = limited_blocks;
+            shared.rpc_handler.set_account_head(message)?;
+            {
+                first_request = false;
+                start_hash = end_hash;
+            }
+        }
+        if scan_complete {
             let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
                 account: account.name.clone(),
                 enabled: true,
@@ -270,9 +305,10 @@ async fn update_scan_status(
                 .update_scan_status(account.address, false)
                 .await?;
         }
-        return Ok(SuccessResponse { success: true });
+        Ok(SuccessResponse { success: true })
+    } else {
+        Err(OreoError::BadSignature)
     }
-    Ok(SuccessResponse { success: true })
 }
 
 pub async fn update_scan_status_handler(
@@ -280,11 +316,7 @@ pub async fn update_scan_status_handler(
     extract::Json(response): extract::Json<DecryptionMessage<ScanResponse>>,
 ) -> impl IntoResponse {
     match update_scan_status(shared, response).await {
-        Ok(response) => RpcResponse {
-            status: 200,
-            data: response,
-        }
-        .into_response(),
+        Ok(response) => Json(response).into_response(),
         Err(err) => err.into_response(),
     }
 }

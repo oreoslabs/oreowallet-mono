@@ -47,6 +47,8 @@ pub enum OreoError {
     Unauthorized,
     #[error("RPC stream error")]
     RpcStreamError(String),
+    #[error("Invalid signature")]
+    BadSignature,
 }
 
 impl IntoResponse for OreoError {
@@ -90,6 +92,7 @@ fn get_status_code(err: OreoError) -> (StatusCode, String) {
         OreoError::RpcStreamError(_) => (StatusCode::from_u16(615).unwrap(), err.to_string()),
         OreoError::TooManyProofs => (StatusCode::from_u16(616).unwrap(), err.to_string()),
         OreoError::GenerateProofError(_) => (StatusCode::from_u16(617).unwrap(), err.to_string()),
+        OreoError::BadSignature => (StatusCode::from_u16(618).unwrap(), err.to_string()),
     };
     (status_code, err_msg)
 }

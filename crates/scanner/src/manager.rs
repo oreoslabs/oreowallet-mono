@@ -70,7 +70,7 @@ pub struct AccountInfo {
     pub in_vk: String,
     pub out_vk: String,
     // mapping from block_hash to transaction list in this block
-    pub blocks: HashMap<String, Vec<TransactionWithHash>>,
+    pub blocks: HashMap<String, (i64, Vec<TransactionWithHash>)>,
 }
 
 impl AccountInfo {
@@ -343,11 +343,14 @@ impl Manager {
                         info!("new available block {} for account {}", block_hash, address);
                         account.blocks.insert(
                             block_hash.clone(),
-                            response
-                                .data
-                                .into_iter()
-                                .map(|hash| TransactionWithHash { hash })
-                                .collect(),
+                            (
+                                task_info.sequence,
+                                response
+                                    .data
+                                    .into_iter()
+                                    .map(|hash| TransactionWithHash { hash })
+                                    .collect(),
+                            ),
                         );
                     }
                     account.remaining_task -= 1;
@@ -376,8 +379,9 @@ impl Manager {
                 blocks: account_info
                     .blocks
                     .iter()
-                    .map(|(k, v)| BlockWithHash {
+                    .map(|(k, (sequence, v))| BlockWithHash {
                         hash: k.to_string(),
+                        sequence: *sequence,
                         transactions: v.clone(),
                     })
                     .collect(),
@@ -391,6 +395,8 @@ impl Manager {
                 message: set_account_head_request,
                 signature,
             };
+            info!("Scanning for account {} completed", address);
+            let _ = self.account_mappling.write().await.remove(&address);
             let mut retry = 0;
             loop {
                 if retry == 3 {
@@ -406,9 +412,8 @@ impl Manager {
                     break;
                 }
                 retry += 1;
+                sleep(Duration::from_secs(3)).await;
             }
-            info!("Scanning for account {} completed", address);
-            let _ = self.account_mappling.write().await.remove(&address);
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
         Ok(())

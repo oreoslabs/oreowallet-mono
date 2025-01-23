@@ -84,6 +84,13 @@ impl SharedState {
             _ => Mainnet::ACCOUNT_VERSION,
         }
     }
+
+    pub fn set_account_limit(&self) -> usize {
+        match self.network() {
+            Testnet::ID => Testnet::SET_ACCOUNT_LIMIT,
+            _ => Mainnet::SET_ACCOUNT_LIMIT,
+        }
+    }
 }
 
 unsafe impl Send for SharedState {}
@@ -176,7 +183,7 @@ pub async fn run_server<N: Network>(
                 .layer(HandleErrorLayer::new(|_: BoxError| async {
                     StatusCode::REQUEST_TIMEOUT
                 }))
-                .layer(TimeoutLayer::new(Duration::from_secs(30))),
+                .layer(TimeoutLayer::new(Duration::from_secs(60))),
         )
         .layer(
             CorsLayer::new()
