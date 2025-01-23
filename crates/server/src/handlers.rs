@@ -264,12 +264,12 @@ async fn update_scan_status(
         message.account = account.name.clone();
         let mut blocks = message.blocks;
         blocks.sort_by(|a, b| b.sequence.cmp(&a.sequence));
+        let mut start_hash = String::new();
+        let mut start_sequence = i64::MAX;
+        let mut end_hash = String::new();
+        let mut end_sequence = -1;
         loop {
             let mut limited_blocks = Vec::with_capacity(batch_size);
-            let mut start_hash = String::new();
-            let mut start_sequence = i64::MAX;
-            let mut end_hash = String::new();
-            let mut end_sequence = -1;
             while let Some(block) = blocks.pop() {
                 if block.sequence <= start_sequence {
                     start_sequence = block.sequence;
@@ -285,18 +285,24 @@ async fn update_scan_status(
                     break;
                 }
             }
-            if limited_blocks.is_empty() {
+            if !first_request && limited_blocks.is_empty() {
                 break;
             }
             message.blocks = limited_blocks;
             if !first_request {
-                message.start = start_hash;
+                message.start = start_hash.clone();
             }
             if !blocks.is_empty() {
-                message.end = end_hash;
+                message.end = end_hash.clone();
             }
             shared.rpc_handler.set_account_head(message.clone())?;
-            first_request = false;
+            {
+                first_request = false;
+                start_sequence = end_sequence;
+                start_hash = end_hash.clone();
+                end_sequence = -1;
+                end_hash = String::new();
+            }
         }
         if scan_complete {
             let _ = shared.rpc_handler.set_scanning(RpcSetScanningRequest {
