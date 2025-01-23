@@ -183,7 +183,7 @@ pub async fn run_server<N: Network>(
                 .layer(HandleErrorLayer::new(|_: BoxError| async {
                     StatusCode::REQUEST_TIMEOUT
                 }))
-                .layer(TimeoutLayer::new(Duration::from_secs(30))),
+                .layer(TimeoutLayer::new(Duration::from_secs(60))),
         )
         .layer(
             CorsLayer::new()
