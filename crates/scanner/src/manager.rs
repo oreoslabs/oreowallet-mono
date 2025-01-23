@@ -395,6 +395,8 @@ impl Manager {
                 message: set_account_head_request,
                 signature,
             };
+            info!("Scanning for account {} completed", address);
+            let _ = self.account_mappling.write().await.remove(&address);
             let mut retry = 0;
             loop {
                 if retry == 3 {
@@ -410,9 +412,8 @@ impl Manager {
                     break;
                 }
                 retry += 1;
+                sleep(Duration::from_secs(3)).await;
             }
-            info!("Scanning for account {} completed", address);
-            let _ = self.account_mappling.write().await.remove(&address);
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
         Ok(())

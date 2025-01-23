@@ -18,8 +18,8 @@ impl ServerHandler {
         Self {
             endpoint,
             agent: AgentBuilder::new()
-                .timeout_read(Duration::from_secs(5))
-                .timeout_write(Duration::from_secs(5))
+                .timeout_read(Duration::from_secs(60))
+                .timeout_write(Duration::from_secs(60))
                 .build(),
         }
     }
