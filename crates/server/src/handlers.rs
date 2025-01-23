@@ -305,9 +305,10 @@ async fn update_scan_status(
                 .update_scan_status(account.address, false)
                 .await?;
         }
-        return Ok(SuccessResponse { success: true });
+        Ok(SuccessResponse { success: true })
+    } else {
+        Err(OreoError::BadSignature)
     }
-    Ok(SuccessResponse { success: true })
 }
 
 pub async fn update_scan_status_handler(
@@ -315,11 +316,7 @@ pub async fn update_scan_status_handler(
     extract::Json(response): extract::Json<DecryptionMessage<ScanResponse>>,
 ) -> impl IntoResponse {
     match update_scan_status(shared, response).await {
-        Ok(response) => RpcResponse {
-            status: 200,
-            data: response,
-        }
-        .into_response(),
+        Ok(response) => Json(response).into_response(),
         Err(err) => err.into_response(),
     }
 }

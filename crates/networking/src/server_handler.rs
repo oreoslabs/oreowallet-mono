@@ -2,7 +2,7 @@ use std::{fmt::Debug, time::Duration};
 
 use oreo_errors::OreoError;
 use serde::Deserialize;
-use tracing::debug;
+use tracing::{debug, error};
 use ureq::{Agent, AgentBuilder, Error, Response};
 
 use crate::decryption_message::{DecryptionMessage, ScanRequest, ScanResponse, SuccessResponse};
@@ -49,9 +49,15 @@ fn handle_response<S: Debug + for<'a> Deserialize<'a>>(
     let res = match resp {
         Ok(response) => match response.into_json::<S>() {
             Ok(data) => Ok(data),
-            Err(_) => Err(OreoError::DServerError),
+            Err(e) => {
+                error!("failed to parse json {}", e);
+                Err(OreoError::DServerError)
+            }
         },
-        _ => Err(OreoError::DServerError),
+        Err(e) => {
+            error!("error response {}", e);
+            Err(OreoError::DServerError)
+        }
     };
     debug!("Handle rpc response: {:?}", res);
     res
