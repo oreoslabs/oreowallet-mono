@@ -77,19 +77,3 @@ pub struct Worker {
     #[clap(short, long, default_value = "0")]
     pub verbosity: u8,
 }
-
-#[derive(Parser, Debug, Clone)]
-pub struct ChainLoader {
-    /// Specify the path to the db config file.
-    #[clap(long)]
-    pub dbconfig: String,
-    /// The Ironfish rpc node to connect to.
-    #[clap(short, long, default_value = "127.0.0.1:9092")]
-    pub node: String,
-    /// The network to work on, 0 for mainnet, 1 for testnet.
-    #[clap(long, default_value = "0")]
-    pub network: u8,
-    /// Specify the verbosity of the server [options: 0, 1, 2].
-    #[clap(short, long, default_value = "0")]
-    pub verbosity: u8,
-}

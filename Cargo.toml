@@ -9,6 +9,5 @@ members = [
     "crates/prover",
     "crates/dworker",
     "crates/scanner",
-    "crates/chain_loader", 
     "crates/params",
 ]
