@@ -23,6 +23,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
     libssl3 \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
