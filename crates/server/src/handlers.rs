@@ -469,7 +469,7 @@ pub async fn create_transaction_handler(
         .create_transaction(RpcCreateTxRequest {
             account: db_account.unwrap().name,
             outputs: Some(outputs),
-            fee: Some(create_transaction.fee.unwrap_or("1".into())),
+            fee: create_transaction.fee,
             expiration_delta: Some(create_transaction.expiration_delta.unwrap_or(30)),
             mints: Some(mints),
             burns: Some(burns),
