@@ -430,6 +430,7 @@ pub async fn get_transactions_handler(
         .get_transactions(RpcGetTransactionsRequest {
             account: db_account.unwrap().name,
             limit: Some(get_transactions.limit.unwrap_or(6)),
+            offset: Some(get_transactions.offset.unwrap_or(0)),
             reverse: Some(true),
         })
         .into_response()
