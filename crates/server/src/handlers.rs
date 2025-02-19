@@ -281,8 +281,8 @@ async fn update_scan_status(
             if !limited_blocks.is_empty() && !blocks.is_empty() {
                 let last_block = limited_blocks.last().unwrap();
                 message.end = last_block.hash.clone();
-                let q = shared.db_handler.get_blocks(last_block.sequence, last_block.sequence + 1).await?;
-                start_hash = q[q.len() - 1].hash.clone();
+                let q = shared.rpc_handler.get_blocks(last_block.sequence as u64, last_block.sequence as u64 + 1)?;
+                start_hash = q.data.blocks[q.data.blocks.len() - 1].block.hash.clone();
             }
 
             message.blocks = limited_blocks;
