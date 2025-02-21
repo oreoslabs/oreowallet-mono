@@ -33,8 +33,8 @@ impl RpcHandler {
         Self {
             endpoint,
             agent: AgentBuilder::new()
-                .timeout_read(Duration::from_secs(5))
-                .timeout_write(Duration::from_secs(5))
+                .timeout_read(Duration::from_secs(30))
+                .timeout_write(Duration::from_secs(30))
                 .build(),
         }
     }

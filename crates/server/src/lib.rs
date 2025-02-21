@@ -4,8 +4,9 @@ use axum_extra::{
 };
 use params::{mainnet::Mainnet, network::Network, testnet::Testnet};
 use sha2::{Digest, Sha256};
-use std::str;
-use std::{env, net::SocketAddr, sync::Arc, time::Duration};
+use std::str::{self, FromStr};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+use utils::Signer;
 
 use anyhow::Result;
 use axum::{
@@ -34,17 +35,11 @@ use crate::handlers::{
 
 mod handlers;
 
-#[derive(Debug, Clone)]
-pub struct SecpKey {
-    pub sk: [u8; 32],
-    pub pk: [u8; 33],
-}
-
 pub struct SharedState {
     pub db_handler: Box<dyn Send + Sync + DBHandler>,
     pub rpc_handler: RpcHandler,
     pub scan_handler: ServerHandler,
-    pub secp: SecpKey,
+    pub operator: Signer,
     pub network: u8,
 }
 
@@ -53,14 +48,15 @@ impl SharedState {
         db_handler: Box<dyn DBHandler + Send + Sync>,
         endpoint: &str,
         scan: &str,
-        secp: SecpKey,
+        operator: String,
         network: u8,
     ) -> Self {
+        let operator = Signer::from_str(&operator).expect("Invalid secret key used");
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
             scan_handler: ServerHandler::new(scan.into()),
-            secp,
+            operator,
             network,
         }
     }
@@ -86,6 +82,13 @@ impl SharedState {
         match self.network() {
             Testnet::ID => Testnet::ACCOUNT_VERSION,
             _ => Mainnet::ACCOUNT_VERSION,
+        }
+    }
+
+    pub fn set_account_limit(&self) -> usize {
+        match self.network() {
+            Testnet::ID => Testnet::SET_ACCOUNT_LIMIT,
+            _ => Mainnet::SET_ACCOUNT_LIMIT,
         }
     }
 }
@@ -127,8 +130,7 @@ pub async fn run_server<N: Network>(
     rpc_server: String,
     db_handler: Box<dyn DBHandler + Send + Sync>,
     scan: String,
-    sk_u8: [u8; 32],
-    pk_u8: [u8; 33],
+    operator: String,
 ) -> Result<()> {
     let genesis_hash;
     {
@@ -147,10 +149,7 @@ pub async fn run_server<N: Network>(
         db_handler,
         &rpc_server,
         &scan,
-        SecpKey {
-            sk: sk_u8,
-            pk: pk_u8,
-        },
+        operator,
         N::ID,
     ));
     let auth_middleware = from_fn_with_state(shared_resource.clone(), auth);
@@ -158,6 +157,7 @@ pub async fn run_server<N: Network>(
     let no_auth_router = Router::new()
         .route("/import", post(import_account_handler))
         .route("/healthCheck", get(health_check_handler))
+        .route("/latestBlock", get(latest_block_handler))
         .route("/updateScan", post(update_scan_status_handler))
         .with_state(shared_resource.clone());
 
@@ -170,14 +170,11 @@ pub async fn run_server<N: Network>(
         .route("/broadcastTx", post(add_transaction_handler))
         .route("/addTx", post(add_transaction_handler))
         .route("/accountStatus", post(account_status_handler))
-        .route("/latestBlock", get(latest_block_handler))
         .route("/ores", post(get_ores_handler))
         .route("/rescan", post(rescan_account_handler))
         .with_state(shared_resource.clone());
 
-    if env::var("ENABLE_AUTH").unwrap_or_else(|_| "false".to_string()) == "true" {
-        auth_router = auth_router.layer(auth_middleware);
-    }
+    auth_router = auth_router.layer(auth_middleware);
 
     let router = no_auth_router
         .merge(auth_router)
@@ -186,7 +183,7 @@ pub async fn run_server<N: Network>(
                 .layer(HandleErrorLayer::new(|_: BoxError| async {
                     StatusCode::REQUEST_TIMEOUT
                 }))
-                .layer(TimeoutLayer::new(Duration::from_secs(30))),
+                .layer(TimeoutLayer::new(Duration::from_secs(60))),
         )
         .layer(
             CorsLayer::new()

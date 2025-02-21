@@ -20,7 +20,7 @@ impl Network for Mainnet {
 
     const OREOSRIPTIONS_ENDPOINT: &'static str = "https://api.orescriptions.com/v1/api";
 
-    const REORG_DEPTH: i64 = 100;
+    const REORG_DEPTH: i64 = 50;
 
     const PRIMARY_BATCH: u64 = 100;
 
@@ -28,5 +28,7 @@ impl Network for Mainnet {
 
     const RESCHEDULING_DURATION: std::time::Duration = std::time::Duration::from_secs(30);
 
-    const LOCAL_BLOCKS_CHECKPOINT: u64 = 900_000;
+    const LOCAL_BLOCKS_CHECKPOINT: u64 = 939_400;
+
+    const SET_ACCOUNT_LIMIT: usize = 20;
 }

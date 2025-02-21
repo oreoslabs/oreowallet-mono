@@ -30,15 +30,6 @@ impl RedisClient {
         self.client.get_multiplexed_async_connection().await
     }
 
-    pub async fn set_str(&self, key: &str, value: &str, ttl_seconds: i64) -> RedisResult<()> {
-        let mut con = self.get_con().await?;
-        con.set(key, value).await?;
-        if ttl_seconds > 0 {
-            con.expire(key, ttl_seconds).await?;
-        }
-        Ok(())
-    }
-
     pub async fn hset(&self, key: &str, field: &str, value: &str) -> RedisResult<()> {
         let mut con = self.get_con().await?;
         con.hset(key, field, value).await

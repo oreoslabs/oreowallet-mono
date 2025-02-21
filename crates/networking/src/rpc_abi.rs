@@ -101,6 +101,7 @@ pub struct TransactionWithHash {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BlockWithHash {
     pub hash: String,
+    pub sequence: i64,
     pub transactions: Vec<TransactionWithHash>,
 }
 
@@ -263,6 +264,7 @@ pub struct RpcAddTxResponse {
 pub struct RpcGetTransactionsRequest {
     pub account: String,
     pub limit: Option<u32>,
+    pub offset: Option<u32>,
     pub reverse: Option<bool>,
 }
 

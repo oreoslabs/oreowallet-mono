@@ -2,7 +2,6 @@ use std::{
     cmp::{self, Reverse},
     net::SocketAddr,
     ops::Deref,
-    str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -16,7 +15,7 @@ use axum::{
     BoxError, Json, Router,
 };
 use db_handler::{DBHandler, InnerBlock};
-use manager::{AccountInfo, Manager, SecpKey, ServerMessage, SharedState, TaskInfo};
+use manager::{AccountInfo, Manager, ServerMessage, SharedState, TaskInfo};
 use networking::{
     decryption_message::{DecryptionMessage, ScanRequest, SuccessResponse},
     rpc_abi::BlockInfo,
@@ -27,7 +26,7 @@ use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{debug, error, info, warn};
-use utils::{blocks_range, default_secp, verify, Signature};
+use utils::blocks_range;
 
 pub mod manager;
 pub mod router;
@@ -109,14 +108,9 @@ pub async fn run_dserver<N: Network>(
     rpc_server: String,
     db_handler: Box<dyn Send + Sync + DBHandler>,
     server: String,
-    sk_u8: [u8; 32],
-    pk_u8: [u8; 33],
+    operator: String,
 ) -> anyhow::Result<()> {
-    let secp_key = SecpKey {
-        sk: sk_u8,
-        pk: pk_u8,
-    };
-    let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server, &server, secp_key));
+    let shared_resource = Arc::new(SharedState::new(db_handler, &rpc_server, &server, operator));
     let manager = Manager::new(shared_resource, N::ID);
 
     if let Err(e) = Manager::initialize_networking(manager.clone(), dlisten).await {
@@ -175,7 +169,13 @@ pub async fn run_dserver<N: Network>(
                         warn!("Unexpected duplicated account to scan {}", account.address);
                         continue;
                     }
-                    let head = account.head.clone().unwrap();
+                    let head = {
+                        let head = account.head.clone().unwrap();
+                        match head.sequence >= scan_end.sequence {
+                            true => scan_end.clone(),
+                            false => head,
+                        }
+                    };
                     let _ = schduler.account_mappling.write().await.insert(
                         account.address.clone(),
                         AccountInfo::new(
@@ -355,21 +355,11 @@ pub async fn account_scanner_handler(
 ) -> impl IntoResponse {
     info!("new scan request coming: {:?}", request);
     let DecryptionMessage { message, signature } = request;
-    let secp = default_secp();
-    let msg = bincode::serialize(&message).unwrap();
-    let signature = Signature::from_str(&signature).unwrap();
-    if let Ok(x) = verify(
-        &secp,
-        &msg[..],
-        signature.serialize_compact(),
-        &manager.shared.secp_key.pk,
-    ) {
-        if x {
-            if !manager.should_skip_request(message.address.clone()).await {
-                let _ = manager.accounts_to_scan.write().await.push(message);
-            }
-            return Json(SuccessResponse { success: true });
+    if let Ok(true) = manager.shared.operator.verify(&message, signature) {
+        if !manager.should_skip_request(message.address.clone()).await {
+            let _ = manager.accounts_to_scan.write().await.push(message);
         }
+        return Json(SuccessResponse { success: true });
     }
     Json(SuccessResponse { success: false })
 }

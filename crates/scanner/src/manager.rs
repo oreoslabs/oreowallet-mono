@@ -2,6 +2,7 @@ use std::{
     cmp::Reverse,
     collections::HashMap,
     net::SocketAddr,
+    str::FromStr,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -30,7 +31,7 @@ use tokio::{
 };
 use tokio_util::codec::{FramedRead, FramedWrite};
 use tracing::{debug, error, info, warn};
-use utils::{default_secp, sign};
+use utils::Signer;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -69,7 +70,7 @@ pub struct AccountInfo {
     pub in_vk: String,
     pub out_vk: String,
     // mapping from block_hash to transaction list in this block
-    pub blocks: HashMap<String, Vec<TransactionWithHash>>,
+    pub blocks: HashMap<String, (i64, Vec<TransactionWithHash>)>,
 }
 
 impl AccountInfo {
@@ -91,17 +92,11 @@ impl AccountInfo {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct SecpKey {
-    pub sk: [u8; 32],
-    pub pk: [u8; 33],
-}
-
 pub struct SharedState {
     pub db_handler: Box<dyn Send + Sync + DBHandler>,
     pub rpc_handler: RpcHandler,
     pub server_handler: ServerHandler,
-    pub secp_key: SecpKey,
+    pub operator: Signer,
 }
 
 unsafe impl Send for SharedState {}
@@ -112,13 +107,14 @@ impl SharedState {
         db_handler: Box<dyn Send + Sync + DBHandler>,
         endpoint: &str,
         server: &str,
-        secp_key: SecpKey,
+        operator: String,
     ) -> Self {
+        let operator = Signer::from_str(&operator).expect("Invalid secret key used");
         Self {
             db_handler: db_handler,
             rpc_handler: RpcHandler::new(endpoint.into()),
             server_handler: ServerHandler::new(server.into()),
-            secp_key,
+            operator,
         }
     }
 }
@@ -347,11 +343,14 @@ impl Manager {
                         info!("new available block {} for account {}", block_hash, address);
                         account.blocks.insert(
                             block_hash.clone(),
-                            response
-                                .data
-                                .into_iter()
-                                .map(|hash| TransactionWithHash { hash })
-                                .collect(),
+                            (
+                                task_info.sequence,
+                                response
+                                    .data
+                                    .into_iter()
+                                    .map(|hash| TransactionWithHash { hash })
+                                    .collect(),
+                            ),
                         );
                     }
                     account.remaining_task -= 1;
@@ -380,21 +379,24 @@ impl Manager {
                 blocks: account_info
                     .blocks
                     .iter()
-                    .map(|(k, v)| BlockWithHash {
+                    .map(|(k, (sequence, v))| BlockWithHash {
                         hash: k.to_string(),
+                        sequence: *sequence,
                         transactions: v.clone(),
                     })
                     .collect(),
             };
-            let msg = bincode::serialize(&set_account_head_request).unwrap();
-            let secp = default_secp();
-            let signature = sign(&secp, &msg[..], &self.shared.secp_key.sk)
-                .unwrap()
-                .to_string();
+            let signature = self
+                .shared
+                .operator
+                .sign(&set_account_head_request)
+                .unwrap_or("default_signature, should never happen".into());
             let request = DecryptionMessage {
                 message: set_account_head_request,
                 signature,
             };
+            info!("Scanning for account {} completed", address);
+            let _ = self.account_mappling.write().await.remove(&address);
             let mut retry = 0;
             loop {
                 if retry == 3 {
@@ -410,9 +412,8 @@ impl Manager {
                     break;
                 }
                 retry += 1;
+                sleep(Duration::from_secs(3)).await;
             }
-            info!("Scanning for account {} completed", address);
-            let _ = self.account_mappling.write().await.remove(&address);
         }
         let _ = self.task_mapping.write().await.remove(&task_id);
         Ok(())

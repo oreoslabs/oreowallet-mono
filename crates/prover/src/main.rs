@@ -1,20 +1,7 @@
-use std::net::SocketAddr;
-
 use anyhow::Result;
-use clap::Parser;
 use prover::run_prover;
 use tracing::info;
-use utils::{initialize_logger, initialize_logger_filter, EnvFilter};
-
-#[derive(Parser, Debug, Clone)]
-pub struct Prover {
-    /// The ip:port prover will listen on
-    #[clap(short, long, default_value = "0.0.0.0:10002")]
-    listen: SocketAddr,
-    /// Set prover logger level
-    #[clap(short, long, default_value = "0")]
-    verbosity: u8,
-}
+use utils::{initialize_logger, initialize_logger_filter, EnvFilter, Parser, Prover};
 
 #[tokio::main]
 async fn main() -> Result<()> {
