@@ -99,7 +99,7 @@ pub async fn handle_connection(
 
     // send to scheduler loop
     let (router, handler) = oneshot::channel();
-    tokio::spawn(async move {
+    let write_channel_handler = tokio::spawn(async move {
         let _ = router.send(());
         while let Some(message) = rx.recv().await {
             debug!("write message to scheduler {:?}", message);
@@ -107,7 +107,7 @@ pub async fn handle_connection(
                 DMessage::DResponse(response) => {
                     if let Err(e) = socket_w_handler.send(DMessage::DResponse(response)).await {
                         error!("failed to send DResponse message, {:?}", e);
-                        return;
+                        return Err(anyhow!("failed to send DResponse message"));
                     }
                 }
                 DMessage::RegisterWorker(register) => {
@@ -116,19 +116,23 @@ pub async fn handle_connection(
                         .await
                     {
                         error!("failed to send RegisterWorker message, {:?}", e);
-                        return;
+                        return Err(anyhow!("failed to send RegisterWorker message"));
                     }
                 }
-                _ => error!("invalid message to send"),
+                _ => {
+                    error!("invalid message to send");
+                    return Err(anyhow!("invalid message to send"));
+                }
             }
         }
+        Ok(())
     });
     let _ = handler.await;
 
     // receive task handler loop
     let task_tx = tx.clone();
     let (router, handler) = oneshot::channel();
-    tokio::spawn(async move {
+    let read_channel_handler = tokio::spawn(async move {
         let _ = router.send(());
         while let Some(Ok(message)) = socket_r_handler.next().await {
             match message {
@@ -137,14 +141,16 @@ pub async fn handle_connection(
                     let response = decrypt(worker_pool.clone(), request).await;
                     if let Err(e) = task_tx.send(DMessage::DResponse(response)).await {
                         error!("failed to send response to write channel, {}", e);
+                        return Err(anyhow!("failed to send response to write channel"));
                     }
                 }
                 _ => {
                     error!("invalid message");
-                    break;
+                    return Err(anyhow!("invalid message"));
                 }
             }
         }
+        Ok(())
     });
     let _ = handler.await;
 
@@ -163,7 +169,19 @@ pub async fn handle_connection(
         }
     });
     let _ = handler.await;
-    Ok(())
+
+    loop {
+        tokio::select! {
+            _ = read_channel_handler => {
+                error!("read channel handler exited");
+                return Err(anyhow!("read channel handler exited"));
+            }
+            _ = write_channel_handler => {
+                error!("write channel handler exited");
+                return Err(anyhow!("write channel handler exited"));
+            }
+        }
+    }
 }
 
 pub async fn reconnect_tcp(addr: SocketAddr) -> anyhow::Result<TcpStream> {
