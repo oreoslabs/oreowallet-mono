@@ -221,8 +221,8 @@ pub async fn run_dserver<N: Network>(
                         .await
                         .unwrap();
                     // avoid too much memory usage
-                    if group.end % 30000 == 0 {
-                        sleep(Duration::from_secs(1)).await;
+                    if (schduler.task_queue.read().await.len() > 10000) {
+                        sleep(Duration::from_secs(3)).await;
                     }
                 }
             }
