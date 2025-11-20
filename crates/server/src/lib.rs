@@ -20,8 +20,12 @@ use axum::{
     BoxError, Router,
 };
 use db_handler::DBHandler;
-use networking::{rpc_abi::BlockInfo, rpc_handler::RpcHandler, server_handler::ServerHandler};
-use tokio::net::TcpListener;
+use networking::{
+    rpc_abi::{BlockInfo, RpcGetBalancesRequest, RpcRemoveAccountRequest},
+    rpc_handler::RpcHandler,
+    server_handler::ServerHandler,
+};
+use tokio::{net::TcpListener, sync::oneshot, time::sleep};
 use tower::{timeout::TimeoutLayer, ServiceBuilder};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
@@ -154,6 +158,9 @@ pub async fn run_server<N: Network>(
     ));
     let auth_middleware = from_fn_with_state(shared_resource.clone(), auth);
 
+    // Start zombie account check thread
+    let _ = zombie_account_check(shared_resource.clone()).await;
+
     let no_auth_router = Router::new()
         .route("/import", post(import_account_handler))
         .route("/healthCheck", get(health_check_handler))
@@ -201,4 +208,56 @@ pub async fn run_server<N: Network>(
 
 async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "Not Found")
+}
+
+async fn zombie_account_check(shared_state: Arc<SharedState>) -> Result<()> {
+    let (router, handler) = oneshot::channel();
+    tokio::spawn(async move {
+        let _ = router.send(());
+        loop {
+            let chain_head = shared_state.rpc_handler.get_latest_block();
+            if chain_head.is_err() {
+                continue;
+            }
+            let chain_head = chain_head.unwrap().data.current_block_identifier;
+            let latest_height = chain_head.index.parse::<u64>().unwrap();
+            let zombie_checkpoint = latest_height - 1440 * 14;
+
+            if let Ok(accounts) = shared_state.db_handler.get_accounts().await {
+                for account in accounts {
+                    if let Ok(acc) = shared_state
+                        .rpc_handler
+                        .get_balances(RpcGetBalancesRequest {
+                            account: account.name.clone(),
+                            confirmations: Some(3),
+                        })
+                    {
+                        if acc.data.balances.is_empty()
+                            || acc.data.balances.iter().all(|b| b.available == "0")
+                        {
+                            if account.create_head.unwrap_or(100) < zombie_checkpoint as i64 {
+                                let _ = shared_state.rpc_handler.remove_account(
+                                    RpcRemoveAccountRequest {
+                                        account: account.name.clone(),
+                                        confirm: Some(true),
+                                        wait: None,
+                                    },
+                                );
+                                let _ = shared_state
+                                    .db_handler
+                                    .remove_account(account.address)
+                                    .await;
+                                info!("Removed zombie account: {}", account.name);
+                            }
+                        }
+                    }
+                }
+            }
+            info!("Zombie account check completed");
+            sleep(Duration::from_secs(60 * 60 * 24)).await;
+        }
+    });
+
+    let _ = handler.await;
+    Ok(())
 }
