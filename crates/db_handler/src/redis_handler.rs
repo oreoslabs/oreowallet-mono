@@ -143,6 +143,10 @@ impl DBHandler for RedisClient {
     async fn get_blocks(&self, _start: i64, _end: i64) -> Result<Vec<InnerBlock>, OreoError> {
         unimplemented!("Redis is deprecated for such feature!")
     }
+
+    async fn get_accounts(&self) -> Result<Vec<Account>, OreoError> {
+        unimplemented!("Redis is deprecated for such feature!")
+    }
 }
 
 pub fn address_to_name(address: &str) -> String {

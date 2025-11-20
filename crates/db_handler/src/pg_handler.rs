@@ -157,6 +157,13 @@ impl PgHandler {
             .get(0);
         Ok(result)
     }
+
+    async fn get_all_accounts(&self) -> Result<Vec<Account>, sqlx::Error> {
+        let result = sqlx::query_as("SELECT * FROM wallet.account")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(result)
+    }
 }
 
 #[async_trait::async_trait]
@@ -234,6 +241,12 @@ impl DBHandler for PgHandler {
             true => Ok(blocks),
             false => Err(OreoError::DBError),
         }
+    }
+
+    async fn get_accounts(&self) -> Result<Vec<Account>, OreoError> {
+        self.get_all_accounts()
+            .await
+            .map_err(|_| OreoError::DBError)
     }
 }
 
